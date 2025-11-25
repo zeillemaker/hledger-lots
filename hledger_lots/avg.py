@@ -4,7 +4,9 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from . import checks
-from .lib import AdjustedTxn, CostMethodError, adjust_commodity, get_xirr
+from .lib import CostMethodError, adjust_commodity
+from .utils import get_xirr
+from .types import AdjustedTxn, Txn
 
 
 @dataclass

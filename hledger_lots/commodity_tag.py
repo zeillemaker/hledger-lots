@@ -31,7 +31,8 @@ class CommodityDirective:
             with open(file, "r") as f:
                 for row in f:
                     if row.startswith("commodity"):
-                        rows.append(row)
+                        clean = row.replace("\t", "").rstrip()
+                        rows.append(clean)
         return rows
 
     def get_commodity_tag(self, tag: str):

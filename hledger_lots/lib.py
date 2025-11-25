@@ -6,23 +6,13 @@ import tempfile
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
+from .info import Info
+from .types import AdjustedTxn, Txn
 
 from pyxirr import DayCount, xirr
 from tabulate import tabulate
 
 
-@dataclass
-class AdjustedTxn:
-    date: str
-    price: float
-    base_cur: str
-    qtty: float
-    acct: str
-
-
-@dataclass
-class Txn(AdjustedTxn):
-    type: str
 
 
 class CostMethodError(Exception):
@@ -52,11 +42,7 @@ def get_default_file():
         return (str(default_path),)
 
 
-def get_files_comm(file_path: tuple[str, ...]) -> list[str]:
-    files = []
-    for file in file_path:
-        files = [*files, "-f", file]
-    return files
+
 
 
 def get_avg_fifo(txns: list[AdjustedTxn]):
@@ -67,23 +53,6 @@ def get_avg_fifo(txns: list[AdjustedTxn]):
     total_mult = sum(mult)
     avg = total_mult / total_qtty
     return avg
-
-
-def get_xirr(
-    sell_price: float, sell_date: date, txns: list[AdjustedTxn]
-) -> float | None:
-    if len(txns) == 0:
-        return 0
-
-    dates = [txn.date for txn in txns]
-    buy_amts = [txn.price * txn.qtty for txn in txns]
-    total_qtty = sum(txn.qtty for txn in txns)
-
-    sell_date_txt = sell_date.strftime("%Y-%m-%d")
-    dates = [*dates, sell_date_txt]
-    amts = [*buy_amts, -total_qtty * sell_price]
-    sell_xirr = xirr(dates, amts, day_count=DayCount.THIRTY_U_360)
-    return sell_xirr
 
 
 def dt_list2table(dt_list: list, tablefmt: str = "simple"):

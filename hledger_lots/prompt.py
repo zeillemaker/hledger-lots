@@ -11,7 +11,7 @@ from hledger_lots.hl import all_commodity_txns
 from .avg_info import AllAvgInfo
 from .fifo_info import AllFifoInfo
 from .info import LotsInfo
-from .lib import get_files_comm
+from .utils import get_files_comm
 
 
 class PromptError(BaseException):

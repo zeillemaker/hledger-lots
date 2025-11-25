@@ -4,7 +4,9 @@ from datetime import datetime
 from textwrap import dedent
 
 from . import checks
-from .lib import AdjustedTxn, CostMethodError, adjust_commodity, get_avg_fifo, get_xirr
+from .lib import CostMethodError, adjust_commodity, get_avg_fifo
+from .utils import get_xirr
+from .types import AdjustedTxn, Txn
 
 
 def check_sell(sell: AdjustedTxn, previous_buys: list[AdjustedTxn], check: bool):

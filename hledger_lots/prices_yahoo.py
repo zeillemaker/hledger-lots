@@ -5,13 +5,12 @@ from pathlib import Path
 
 import yfinance as yf
 from requests.exceptions import HTTPError
-from requests_cache import CachedSession
 
 from .commodity_tag import CommodityDirective, CommodityTag
 from .hl import hledger2txn
 from .info import get_last_price
-from .lib import get_files_comm
-
+from .utils import get_files_comm
+from .file_utils import find_all_included_files
 
 @dataclass
 class Price:
@@ -28,18 +27,23 @@ class YahooPrices:
         self.files = files
         self.files_comm = get_files_comm(files)
 
-        self.session_path = Path.home() / "yfinance.cache"
-        self.session = CachedSession(str(self.session_path))
         self.today = datetime.today()
         yesterday = self.today - timedelta(days=1)
         self.yesterday_str = yesterday.strftime("%Y-%m-%d")
 
-        commodity_directive = CommodityDirective(self.files)
+        all_files = []
+        for f in self.files:
+            all_files.extend(find_all_included_files(f))
+        commodity_directive = CommodityDirective(all_files)
         self.commodities = commodity_directive.get_commodity_tag(self.TAG)
+
+
 
     def get_start_date(self, commodity: CommodityTag):
         txns = hledger2txn(self.files, commodity["commodity"])
+
         qtty = sum(txn.qtty for txn in txns)
+
         if qtty == 0:
             print(
                 f"; stderr: No transaction for {commodity['commodity']}. Not downloading ",
@@ -68,58 +72,126 @@ class YahooPrices:
 
     def prices2hledger(self, prices: list[Price]):
         prices_list = [
-            f"P {price.date.strftime('%Y-%m-%d')} \"{price.name}\" {price.price} {price.cur}"
+            f"P {price.date.strftime('%Y-%m-%d')} {price.name} {format(price.price, ',.2f').replace(',', 'X').replace('.', ',').replace('X', '.')} {price.cur}"
             for price in prices
-            if price
         ]
-        prices_str = "\n".join(prices_list)
-        return prices_str
+        return "\n".join(prices_list)
 
     def get_prices(
         self,
         commodity: CommodityTag,
         start_date: str,
     ) -> list[Price]:
-        ticker = yf.Ticker(commodity["value"], session=self.session)
+        """
+        Robustly fetch OHLC history for `commodity['value']` using yfinance.
+        Returns a list[Price]. Writes short debug notes to stderr.
+        """
+        # debug: show which ticker we try to download
+        print(f"; stderr: get_prices: ticker={commodity['value']}, start_date={start_date}", file=sys.stderr)
 
+        # create ticker object (yfinance accepts a session param in recent versions)
         try:
-            info: dict[str, str] = ticker.info
-        except HTTPError:
-            print(f"; stderr: Can't download commodity {commodity}", file=sys.stderr)
+            ticker = yf.Ticker(commodity["value"])
+        except Exception as exc:
+            print(f"; stderr: failed to construct yf.Ticker for {commodity['value']}: {exc}", file=sys.stderr)
             return []
 
+        # Try to fetch some metadata (may be empty depending on yfinance version / rate limits)
+        info = {}
+        try:
+            info = ticker.info or {}
+        except Exception as exc:
+            # non-fatal: we can still attempt history even if info fails
+            print(f"; stderr: ticker.info failed for {commodity['value']}: {exc}", file=sys.stderr)
+
+        # If start_date is falsy bail out
         if not start_date:
+            print(f"; stderr: get_prices: no start_date for {commodity}", file=sys.stderr)
             return []
 
-        df = ticker.history(start=start_date, end=self.yesterday_str, raise_errors=True)
+        # history may raise or return an empty DataFrame — handle both
+        try:
+            df = ticker.history(start=start_date, end=self.yesterday_str, raise_errors=False)
+        except Exception as exc:
+            print(f"; stderr: history() raised for {commodity['value']}: {exc}", file=sys.stderr)
+            return []
 
-        prices = [
-            Price(
-                commodity["commodity"],
-                row[0].to_pydatetime().date(),  # type:ignore
-                row[1]["Close"],  # type: ignore
-                info["currency"],
-            )
-            for row in df.iterrows()
-        ]
+        if df is None or df.empty:
+            print(f"; stderr: history empty for {commodity['value']} between {start_date} and {self.yesterday_str}", file=sys.stderr)
+            return []
+
+        # normalize DataFrame access: prefer 'Close' column; fall back gracefully
+        close_col = None
+        for candidate in ("Close", "Adj Close", "close", "adjclose"):
+            if candidate in df.columns:
+                close_col = candidate
+                break
+        if close_col is None:
+            # maybe single-column dataframe with numeric values
+            if df.shape[1] == 1:
+                close_col = df.columns[0]
+            else:
+                print(f"; stderr: no Close column for {commodity['value']}; columns={list(df.columns)}", file=sys.stderr)
+                return []
+
+        currency = info.get("currency") if isinstance(info, dict) else None
+        if not currency:
+            # default/fallback
+            currency = "USD"
+
+        prices: list[Price] = []
+        # iterate rows using .itertuples for speed/clarity
+        try:
+            for idx, row in df.iterrows():
+                # idx is a Timestamp — convert to date
+                try:
+                    dt = idx.to_pydatetime().date()
+                except Exception:
+                    try:
+                        dt = datetime.strptime(str(idx), "%Y-%m-%d").date()
+                    except Exception:
+                        # skip if we can't parse the date
+                        continue
+
+                try:
+                    close_value = float(row[close_col])
+                except Exception:
+                    # sometimes row is a scalar if single-col df; handle that
+                    try:
+                        close_value = float(row)
+                    except Exception:
+                        continue
+
+                prices.append(Price(commodity["commodity"], dt, close_value, currency))
+        except Exception as exc:
+            print(f"; stderr: error iterating result for {commodity['value']}: {exc}", file=sys.stderr)
+            return []
+
+        # debug: how many prices found
+        print(f"; stderr: get_prices: found {len(prices)} rows for {commodity['value']}", file=sys.stderr)
         return prices
 
+
     def get_commodity_prices(self, commodity: CommodityTag):
+        """
+        Wrapper that determines start_date and returns list[Price] or None.
+        """
         start_date = self.get_start_date(commodity)
         if not start_date:
-            return
+            return None
 
         start_date_str = start_date.strftime("%Y-%m-%d")
         try:
-            prices = [
-                price for price in self.get_prices(commodity, start_date_str) if price
-            ]
+            prices = self.get_prices(commodity, start_date_str)
+            if not prices:
+                # debug: explicit message if prices empty
+                print(f"; stderr: no prices returned for {commodity['value']}", file=sys.stderr)
             return prices
         except HTTPError:
-            print(f"; stderr: {commodity['value']} not found", file=sys.stderr)
-        except Exception:
+            print(f"; stderr: {commodity['value']} not found (HTTPError)", file=sys.stderr)
+        except Exception as exc:
             print(
-                f"; stderr: Nothing downloaded for {commodity['value']} between {start_date} and {self.yesterday_str}",
+                f"; stderr: Nothing downloaded for {commodity['value']} between {start_date} and {self.yesterday_str}: {exc}",
                 file=sys.stderr,
             )
 

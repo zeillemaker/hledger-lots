@@ -1,4 +1,4 @@
-from .lib import AdjustedTxn
+from .types import AdjustedTxn, Txn
 
 
 class MultipleBaseCurrencies(Exception):

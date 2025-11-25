@@ -6,7 +6,8 @@ from hledger_lots.hl import all_commodity_txns, hledger2txn
 
 from .avg_info import AllAvgInfo, AvgInfo
 from .fifo_info import AllFifoInfo, FifoInfo
-from .lib import get_default_file, get_file_from_stdin, get_files_comm
+from .lib import get_default_file, get_file_from_stdin
+from .utils import get_files_comm
 from .options import Options, get_options
 from .prices_yahoo import YahooPrices
 from .prompt import get_append_file

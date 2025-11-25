@@ -3,7 +3,8 @@ from datetime import datetime
 from .checks import MultipleBaseCurrencies
 from .fifo import get_lots
 from .info import AllInfo, Info, LotsInfo
-from .lib import AdjustedTxn, dt_list2table, get_avg_fifo
+from .lib import dt_list2table, get_avg_fifo
+from .types import AdjustedTxn, Txn
 
 
 class FifoInfo(Info):

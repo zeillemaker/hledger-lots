@@ -2,7 +2,8 @@ import json
 import subprocess
 import sys
 
-from .lib import AdjustedTxn, Txn, get_files_comm
+from .utils import get_files_comm
+from .types import AdjustedTxn, Txn
 
 
 def adjust_txn(txn: Txn) -> AdjustedTxn:
@@ -27,16 +28,19 @@ def hledger2txn(
     cur: str,
     no_desc: str | None = None,
 ) -> list[AdjustedTxn]:
-    files_comm = get_files_comm(file_path)
-    comm = ["hledger", *files_comm, "print", f"cur:{cur}", "--output-format=json"]
+    files = file_path
+    comm = ["hledger", "-f", *files, "print", f"cur:{cur}", "--output-format=json"]
+
     if no_desc:
         comm.append(f"not:desc:{no_desc}")
 
     hl_proc = subprocess.run(comm, stdin=sys.stdin, capture_output=True)
+
     if hl_proc.returncode != 0:
         raise ValueError(hl_proc.stderr.decode("utf8"))
 
     hl_data = hl_proc.stdout.decode("utf8")
+
     txns_list = json.loads(hl_data)
 
     txns = [

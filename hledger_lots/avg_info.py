@@ -2,7 +2,8 @@ from datetime import datetime
 
 from .avg import get_avg_cost
 from .info import AllInfo, Info, LotsInfo
-from .lib import AdjustedTxn, dt_list2table
+from .lib import dt_list2table
+from .types import AdjustedTxn, Txn
 
 
 class AvgInfo(Info):

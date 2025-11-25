@@ -1,15 +1,17 @@
 import csv
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import date, datetime
+from pathlib import Path
 from io import StringIO
 from typing import TypedDict
 from textwrap import dedent
-
 from tabulate import tabulate
 
-from .lib import AdjustedTxn, get_files_comm, get_xirr
+from .utils import get_files_comm, get_xirr
+from .file_utils import find_all_included_files
+from .types import AdjustedTxn, Txn
 
 
 class LotsInfo(TypedDict):
@@ -23,15 +25,6 @@ class LotsInfo(TypedDict):
     mkt_profit: str | None
     mkt_date: str | None
     xirr: str | None
-
-
-@dataclass
-class Price:
-    date: date
-    comm: str
-    price: float
-    cur: str
-
 
 LAST_PRICE_DICT: dict[str, tuple[date, float]] = {}
 
@@ -89,13 +82,17 @@ class Info:
         no_desc: str | None = None,
     ) -> None:
         self.journals = journals
-        self.files_comm = get_files_comm(journals)
+        all_files = []
+        for f in journals:
+            all_files.extend(find_all_included_files(f))
+        self.journals = tuple(all_files)
+        self.files_comm = get_files_comm(self.journals)
+
         self.commodity = commodity.upper()
         self.txns = txns
 
         self.has_txn = len(self.txns) > 0
         self.last_price = get_last_price(self.files_comm, commodity)
-
         self.market_date, self.market_price = self.last_price
 
     def get_lots_xirr(self, last_buy_date: date):
@@ -113,7 +110,7 @@ class Info:
             Average Cost:   {info["avg_cost"]}
         """)
 
-        if self.market_date or self.market_price:
+        if self.market_date and self.market_price:
             info_txt += dedent(f"""\
                 Market Price:  {info["mkt_price"]}
                 Market Amount: {info["mkt_amount"]}
@@ -125,7 +122,6 @@ class Info:
             info_txt += "\nMarket Data not available"
 
         return info_txt
-
 
 class AllInfo:
     def __init__(self, journals: tuple[str, ...], no_desc: str) -> None:
