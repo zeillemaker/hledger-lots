@@ -1,20 +1,20 @@
 from datetime import datetime
-from typing import Optional, Tuple
 
 from .avg import get_avg_cost
 from .info import AllInfo, Info, LotsInfo
-from .lib import dt_list2table
+from .lib import AdjustedTxn, dt_list2table
 
 
 class AvgInfo(Info):
     def __init__(
         self,
-        journals: Tuple[str, ...],
+        journals: tuple[str, ...],
         commodity: str,
+        txns: list[AdjustedTxn],
         check: bool,
-        no_desc: Optional[str] = None,
+        no_desc: str | None = None,
     ):
-        super().__init__(journals, commodity, no_desc)
+        super().__init__(journals, commodity, txns, no_desc)
         self.check = check
         self.avg_lots = get_avg_cost(self.txns, self.check)
         self.table = dt_list2table(self.avg_lots)
@@ -69,12 +69,21 @@ class AvgInfo(Info):
 
 
 class AllAvgInfo(AllInfo):
-    def __init__(self, journals: Tuple[str, ...], no_desc: str, check: bool):
+    def __init__(
+        self,
+        journals: tuple[str, ...],
+        no_desc: str,
+        all_txns: dict[str, list[AdjustedTxn]],
+        check: bool,
+    ):
         super().__init__(journals, no_desc)
         self.check = check
+        self.all_txns = all_txns
 
     def get_info(self, commodity: str):
-        avg_obj = AvgInfo(self.journals, commodity, self.check)
+        avg_obj = AvgInfo(
+            self.journals, commodity, self.all_txns[commodity.upper()], self.check
+        )
         if len(avg_obj.txns) == 0:
             return
         else:
@@ -86,8 +95,16 @@ class AllAvgInfo(AllInfo):
         infos = [info for info in infos if info]
         return infos
 
-    def infos_table(self, output_format: str):
+    @property
+    def infos_with_qtty(self):
+        return [x for x in self.infos if int(float(x["qtty"]) * 100) > 0]
+
+    def infos_table(self, output_format: str, exclude_no_quantity=False):
+        if exclude_no_quantity:
+            return self.get_infos_table(self.infos_with_qtty, output_format)
         return self.get_infos_table(self.infos, output_format)
 
-    def infos_csv(self):
+    def infos_csv(self, exclude_no_quantity=False):
+        if exclude_no_quantity:
+            return self.get_infos_csv(self.infos_with_qtty)
         return self.get_infos_csv(self.infos)

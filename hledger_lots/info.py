@@ -4,12 +4,12 @@ import subprocess
 from dataclasses import dataclass
 from datetime import date, datetime
 from io import StringIO
-from typing import List, Optional, Tuple, TypedDict
+from typing import TypedDict
+from textwrap import dedent
 
 from tabulate import tabulate
 
-from .hl import hledger2txn
-from .lib import get_files_comm, get_xirr
+from .lib import AdjustedTxn, get_files_comm, get_xirr
 
 
 class LotsInfo(TypedDict):
@@ -18,11 +18,11 @@ class LotsInfo(TypedDict):
     qtty: str
     amount: str
     avg_cost: str
-    mkt_price: Optional[str]
-    mkt_amount: Optional[str]
-    mkt_profit: Optional[str]
-    mkt_date: Optional[str]
-    xirr: Optional[str]
+    mkt_price: str | None
+    mkt_amount: str | None
+    mkt_profit: str | None
+    mkt_date: str | None
+    xirr: str | None
 
 
 @dataclass
@@ -33,36 +33,44 @@ class Price:
     cur: str
 
 
-def get_last_price(files_comm: List[str], commodity: str):
+LAST_PRICE_DICT: dict[str, tuple[date, float]] = {}
+
+
+def get_last_price_dict(files_comm: list[str]):
+    if LAST_PRICE_DICT:
+        return LAST_PRICE_DICT
     prices_comm = [
         "hledger",
         *files_comm,
         "prices",
-        f"cur:{commodity}",
         "--show-reverse",
     ]
     prices_proc = subprocess.run(prices_comm, capture_output=True)
     prices_str = prices_proc.stdout.decode("utf8")
-
-    if prices_str == "":
-        return (None, None)
-
-    prices_list = [row.split(" ", 3) for row in prices_str.split("\n") if row != ""]
-
-    date_list = [
-        (row[1], re.sub(r"[^0-9.]", "", row[3])) for row in prices_list if len(row) > 0
-    ]
-
-    if len(date_list) == 0:
-        return (None, None)
-
-    last_date_str = date_list[-1][0]
-    last_date = datetime.strptime(last_date_str, "%Y-%m-%d").date()
-    last_price = float(date_list[-1][1])
-    return (last_date, last_price)
+    if not prices_str:
+        return {}
+    for d_string, commodity, price in re.findall(
+        r'(\d+-\d+-\d+) "?([^\s"]+)"?[^\d]*(\d+\.\d+)', prices_str
+    ):
+        comm = commodity.upper()
+        if comm not in LAST_PRICE_DICT:
+            last_date = datetime.strptime(d_string, "%Y-%m-%d").date()
+            LAST_PRICE_DICT[comm] = (last_date, float(price))
+        else:
+            new_date = datetime.strptime(d_string, "%Y-%m-%d").date()
+            old_date, _ = LAST_PRICE_DICT[comm]
+            if new_date > old_date:
+                LAST_PRICE_DICT[comm] = (new_date, float(price))
+    return LAST_PRICE_DICT
 
 
-def get_commodities(journals: Tuple[str, ...]):
+def get_last_price(files_comm: list[str], commodity: str):
+    price_dict = get_last_price_dict(files_comm)
+    output = price_dict.get(commodity.upper(), (None, None))
+    return output
+
+
+def get_commodities(journals: tuple[str, ...]):
     files_comm = get_files_comm(journals)
     comm = ["hledger", *files_comm, "commodities"]
     commodities_proc = subprocess.run(comm, capture_output=True)
@@ -74,12 +82,16 @@ def get_commodities(journals: Tuple[str, ...]):
 
 class Info:
     def __init__(
-        self, journals: Tuple[str, ...], commodity: str, no_desc: Optional[str] = None
+        self,
+        journals: tuple[str, ...],
+        commodity: str,
+        txns: list[AdjustedTxn],
+        no_desc: str | None = None,
     ) -> None:
         self.journals = journals
         self.files_comm = get_files_comm(journals)
         self.commodity = commodity.upper()
-        self.txns = hledger2txn(journals, commodity, no_desc)
+        self.txns = txns
 
         self.has_txn = len(self.txns) > 0
         self.last_price = get_last_price(self.files_comm, commodity)
@@ -92,23 +104,23 @@ class Info:
             return xirr
 
     def get_info_txt(self, info: LotsInfo):
-        info_txt = f"""
-Info
-----
-Commodity:      {info['comm']}
-Quantity:       {info['qtty']}
-Amount:         {info['amount']}
-Average Cost:   {info['avg_cost']}
-"""
+        info_txt = dedent(f"""\
+            Info
+            ----
+            Commodity:      {info["comm"]}
+            Quantity:       {info["qtty"]}
+            Amount:         {info["amount"]}
+            Average Cost:   {info["avg_cost"]}
+        """)
 
         if self.market_date or self.market_price:
-            info_txt += f"""
-Market Price:  {info['mkt_price']}
-Market Amount: {info['mkt_amount']}
-Market Profit: {info['mkt_profit']}
-Market Date:   {info['mkt_date']}
-Xirr:          {info['xirr']} (APR 30/360US)
-"""
+            info_txt += dedent(f"""\
+                Market Price:  {info["mkt_price"]}
+                Market Amount: {info["mkt_amount"]}
+                Market Profit: {info["mkt_profit"]}
+                Market Date:   {info["mkt_date"]}
+                Xirr:          {info["xirr"]} (APR 30/360US)
+            """)
         else:
             info_txt += "\nMarket Data not available"
 
@@ -116,12 +128,12 @@ Xirr:          {info['xirr']} (APR 30/360US)
 
 
 class AllInfo:
-    def __init__(self, journals: Tuple[str, ...], no_desc: str) -> None:
+    def __init__(self, journals: tuple[str, ...], no_desc: str) -> None:
         self.journals = journals
         self.no_desc = no_desc
         self.commodities = get_commodities(journals)
 
-    def get_infos_table(self, infos: List[LotsInfo], output_format: str):
+    def get_infos_table(self, infos: list[LotsInfo], output_format: str):
         infos_list = [info for info in infos]
         infos_sorted = sorted(
             infos_list, key=lambda info: info["xirr"] or "", reverse=True
@@ -135,7 +147,7 @@ class AllInfo:
         )
         return table
 
-    def get_infos_csv(self, infos: List[LotsInfo]):
+    def get_infos_csv(self, infos: list[LotsInfo]):
         infos_list = [info for info in infos]
         infos_sorted = sorted(
             infos_list, key=lambda info: info["xirr"] or "", reverse=True

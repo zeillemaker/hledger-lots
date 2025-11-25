@@ -1,6 +1,8 @@
-from typing import Tuple, TypedDict
+from typing import TypedDict
 
 import rich_click as click
+
+from hledger_lots.hl import all_commodity_txns, hledger2txn
 
 from .avg_info import AllAvgInfo, AvgInfo
 from .fifo_info import AllFifoInfo, FifoInfo
@@ -13,7 +15,7 @@ from .prompt_sell import PromptSell
 
 
 class Obj(TypedDict):
-    file: Tuple[str, ...]
+    file: tuple[str, ...]
     opt: Options
 
 
@@ -46,7 +48,7 @@ click.rich_click.STYLE_OPTIONS_PANEL_BORDER = "dim"  # Possibly conceal
 )
 @click.pass_context
 @click.version_option()
-def cli(ctx: click.Context, file: Tuple[str, ...]):
+def cli(ctx: click.Context, file: tuple[str, ...]):
     """
     Commands to apply FIFO(first-in-first-out) or AVERAGE COST accounting principles without manual management of lots. Useful for transactions involving buying and selling foreign currencies or stocks.
 
@@ -92,10 +94,11 @@ def buy(obj: Obj):
         click.echo("\n" + "Transaction not saved.")
 
     commodity = prompt_buy.info["comm"]
+    txns = hledger2txn(file, commodity)
     if opt.avg_cost:
-        info = AvgInfo(file, commodity, opt.check)
+        info = AvgInfo(file, commodity, txns, opt.check)
     else:
-        info = FifoInfo(file, commodity, opt.check)
+        info = FifoInfo(file, commodity, txns, opt.check)
 
     click.echo(info.table)
     click.echo(info.info_txt)
@@ -132,10 +135,11 @@ def sell(obj: Obj):
         click.echo("\n" + "Transaction not saved.")
 
     commodity = prompt_sell.info["comm"]
+    txns = hledger2txn(file, commodity)
     if opt.avg_cost:
-        info = AvgInfo(file, commodity, opt.check)
+        info = AvgInfo(file, commodity, txns, opt.check)
     else:
-        info = FifoInfo(file, commodity, opt.check)
+        info = FifoInfo(file, commodity, txns, opt.check)
 
     click.echo(info.table)
     click.echo(info.info_txt)
@@ -161,10 +165,11 @@ def view(obj: Obj, commodity: str):
     file = obj["file"]
     opt = obj["opt"]
 
+    txns = hledger2txn(file, commodity)
     if opt.avg_cost:
-        info = AvgInfo(file, commodity, opt.check, opt.no_desc)
+        info = AvgInfo(file, commodity, txns, opt.check, opt.no_desc)
     else:
-        info = FifoInfo(file, commodity, opt.check, opt.no_desc)
+        info = FifoInfo(file, commodity, txns, opt.check, opt.no_desc)
 
     click.echo(info.table)
     click.echo(info.info_txt)
@@ -189,19 +194,20 @@ def list_commodities(obj: Obj, output_format: str):
     file = obj["file"]
     opt = obj["opt"]
 
+    txns = all_commodity_txns(file, opt.no_desc)
     lots_info = (
-        AllAvgInfo(file, opt.no_desc, opt.check)
+        AllAvgInfo(file, opt.no_desc, txns, opt.check)
         if opt.avg_cost
-        else AllFifoInfo(file, opt.no_desc, opt.check)
+        else AllFifoInfo(file, opt.no_desc, txns, opt.check)
     )
 
     if output_format == "pretty":
-        table = lots_info.infos_table("mixed_grid")
+        table = lots_info.infos_table("mixed_grid", exclude_no_quantity=True)
     elif output_format == "csv":
-        infos_io = lots_info.infos_csv()
+        infos_io = lots_info.infos_csv(exclude_no_quantity=True)
         table = infos_io.read()
     else:
-        table = lots_info.infos_table("plain")
+        table = lots_info.infos_table("plain", exclude_no_quantity=True)
 
     click.echo(table)
 

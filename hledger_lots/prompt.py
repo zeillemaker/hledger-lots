@@ -1,10 +1,12 @@
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional, Tuple
+from textwrap import dedent
 
 import questionary
 from prompt_toolkit.shortcuts import CompleteStyle
+
+from hledger_lots.hl import all_commodity_txns
 
 from .avg_info import AllAvgInfo
 from .fifo_info import AllFifoInfo
@@ -29,7 +31,7 @@ class Tradeinfo:
     value: float
 
 
-def custom_autocomplete(name: str, choices: List[str]):
+def custom_autocomplete(name: str, choices: list[str]):
     question = questionary.autocomplete(
         f"{name} (TAB to autocomplete)",
         choices=choices,
@@ -55,7 +57,7 @@ def get_append_file(default_file: str):
         return file_append
 
 
-def select_commodities_text(commodities: List[str]):
+def select_commodities_text(commodities: list[str]):
     answer = questionary.select(
         "Commodity",
         choices=commodities,
@@ -64,7 +66,7 @@ def select_commodities_text(commodities: List[str]):
     return answer
 
 
-def ask_commodities_text(commodities: List[str]):
+def ask_commodities_text(commodities: list[str]):
     answer: str = custom_autocomplete("Commodity", commodities).ask()
     return answer
 
@@ -122,10 +124,10 @@ def val_total(answer: str):
 class Prompt:
     def __init__(
         self,
-        file: Tuple[str, ...],
+        file: tuple[str, ...],
         avg_cost: bool,
         check: bool,
-        no_desc: Optional[str] = None,
+        no_desc: str | None = None,
     ) -> None:
         self.file = file
         self.check = check
@@ -159,10 +161,11 @@ class Prompt:
         return result
 
     def get_infos(self):
+        txns = all_commodity_txns(self.file, self.no_desc or "")
         if self.avg_cost:
-            infos = AllAvgInfo(self.file, self.no_desc or "", self.check)
+            infos = AllAvgInfo(self.file, self.no_desc or "", txns, self.check)
         else:
-            infos = AllFifoInfo(self.file, self.no_desc or "", self.check)
+            infos = AllFifoInfo(self.file, self.no_desc or "", txns, self.check)
 
         valid_infos = [info for info in infos.infos if float(info["qtty"]) > 0]
         return valid_infos
@@ -191,11 +194,11 @@ class Prompt:
             subprocess.run(comm, check=True)
             return file_append
 
-    def ask_date(self, last_purchase: Optional[str]):
+    def ask_date(self, last_purchase: str | None):
         last_purchase = last_purchase
 
         answer: str = questionary.text(
-            f"Date YYYY-MM-DD",
+            "Date YYYY-MM-DD",
             validate=val_date,
             instruction=f"(Last Purchase: {last_purchase})",
         ).ask()
@@ -254,9 +257,9 @@ class Prompt:
         files = [f if f != "-" else "stdin" for f in self.file]
         files_text = " ".join(files)
 
-        result = f"""
-Files              : {files_text}
-Cost Method        : {cost_method_text} - {check_text}
-Remove description : {no_desc_text}
-"""
+        result = dedent(f"""\
+            Files              : {files_text}
+            Cost Method        : {cost_method_text} - {check_text}
+            Remove description : {no_desc_text}
+        """)
         return result
