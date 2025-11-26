@@ -72,7 +72,7 @@ class YahooPrices:
 
     def prices2hledger(self, prices: list[Price]):
         prices_list = [
-            f"P {price.date.strftime('%Y-%m-%d')} {price.name} {format(price.price, ',.2f').replace(',', 'X').replace('.', ',').replace('X', '.')} {price.cur}"
+            f"P {price.date.strftime('%Y-%m-%d')} {price.name} {format(price.price, ',.20f').rstrip("0").replace(',', 'X').replace('.', ',').replace('X', '.')} {price.cur}"
             for price in prices
         ]
         return "\n".join(prices_list)
