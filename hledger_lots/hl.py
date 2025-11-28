@@ -59,8 +59,9 @@ def all_commodity_txns(
     file_path: tuple[str, ...],
     no_desc: str | None = None,
 ):
-    files_comm = get_files_comm(file_path)
-    comm = ["hledger", *files_comm, "print", "--output-format=json"]
+    files = file_path
+    comm = ["hledger", "-f", *files, "print", "--output-format=json"]
+
     if no_desc:
         comm.append(f"not:desc:{no_desc}")
 
