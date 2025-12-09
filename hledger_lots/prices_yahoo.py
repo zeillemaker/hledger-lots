@@ -4,13 +4,14 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import yfinance as yf
+import locale
 from requests.exceptions import HTTPError
 
 from .commodity_tag import CommodityDirective, CommodityTag
 from .hl import hledger2txn
 from .info import get_last_price
 from .utils import get_files_comm
-from .file_utils import find_all_included_files
+from .file_utils import find_all_included_files, format_number
 
 @dataclass
 class Price:
@@ -34,8 +35,10 @@ class YahooPrices:
         all_files = []
         for f in self.files:
             all_files.extend(find_all_included_files(f))
-        commodity_directive = CommodityDirective(all_files)
-        self.commodities = commodity_directive.get_commodity_tag(self.TAG)
+
+        # Save the CommodityDirective object for later use
+        self.commodity_directive = CommodityDirective(all_files)
+        self.commodities = self.commodity_directive.get_commodity_tag(self.TAG)
 
 
 
@@ -53,7 +56,11 @@ class YahooPrices:
 
         first_date_str = txns[0].date
         first_date = datetime.strptime(first_date_str, "%Y-%m-%d").date()
-        last_market_date = get_last_price(self.files_comm, commodity["commodity"])[0]
+        last_market_date = get_last_price(
+            self.files_comm,
+            commodity["commodity"],
+            commodity_directive=self.commodity_directive  # now exists
+        )[0]
 
         if not last_market_date:
             last_date = first_date
@@ -70,11 +77,15 @@ class YahooPrices:
 
         return start_date
 
+
     def prices2hledger(self, prices: list[Price]):
-        prices_list = [
-            f"P {price.date.strftime('%Y-%m-%d')} {price.name} {format(price.price, ',.20f').rstrip("0").replace(',', 'X').replace('.', ',').replace('X', '.')} {price.cur}"
-            for price in prices
-        ]
+        prices_list = []
+        for price in prices:
+            fmt = self.commodity_directive.get_format(price.name)
+            value_str = format_number(price.price, fmt)
+            prices_list.append(
+                f"P {price.date.strftime('%Y-%m-%d')} {price.name} {value_str} {price.cur}"
+            )
         return "\n".join(prices_list)
 
     def get_prices(
@@ -92,7 +103,7 @@ class YahooPrices:
         # create ticker object (yfinance accepts a session param in recent versions)
         try:
             ticker = yf.Ticker(commodity["value"])
-        except Exception as exc:
+        except Exception as fexc:
             print(f"; stderr: failed to construct yf.Ticker for {commodity['value']}: {exc}", file=sys.stderr)
             return []
 

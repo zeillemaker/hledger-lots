@@ -53,3 +53,61 @@ class CommodityDirective:
         ]
 
         return commodities
+
+    def _all_lines_for_commodity(self, commodity: str):
+        """Return all commodity directive lines matching the given commodity name."""
+        result = []
+        for row in self.rows:
+            # Example row: "commodity EUR ; format €1.234,56"
+            m = re.match(r"commodity\s+(.+?)(?:\s*;|$)", row)
+            if m:
+                comm = get_commodity_name(m.group(1)).upper()
+                if comm == commodity.upper():
+                    result.append(row)
+        return result
+
+    def get_format(self, commodity: str) -> dict:
+        """
+        Parse the commodity's format directive.
+        Returns dict:
+            decimal_mark, thousands_sep, currency_symbol, currency_position, space
+        """
+        lines = self._all_lines_for_commodity(commodity)
+        fmt_line = None
+        for line in lines:
+            if line.strip().startswith("format"):
+                fmt_line = line.strip()[6:].strip()
+                break
+
+        # Defaults
+        fmt = {
+            "decimal_mark": ".",
+            "thousands_sep": ",",
+            "currency_symbol": None,
+            "currency_position": "right",
+            "space": True,
+        }
+
+        if not fmt_line:
+            return fmt
+
+        # Match pattern like: 1.234,56 € or €1.234,56
+        match = re.search(r'([^\d]*)([\d.,]+)\s*([^\d]*)', fmt_line)
+        if match:
+            left, number, right = match.groups()
+            fmt["currency_symbol"] = (left or right or None).strip() or None
+            fmt["currency_position"] = "left" if left else "right"
+
+            if "," in number and "." in number:
+                fmt["decimal_mark"] = ","
+                fmt["thousands_sep"] = "."
+            elif "," in number:
+                fmt["decimal_mark"] = ","
+                fmt["thousands_sep"] = ""
+            else:
+                fmt["decimal_mark"] = "."
+                fmt["thousands_sep"] = ","
+
+            fmt["space"] = bool(fmt["currency_symbol"])
+
+        return fmt

@@ -29,9 +29,10 @@ class LotsInfo(TypedDict):
 LAST_PRICE_DICT: dict[str, tuple[date, float]] = {}
 
 
-def get_last_price_dict(files_comm: list[str]):
+def get_last_price_dict(files_comm: list[str], commodity_directive=None):
     if LAST_PRICE_DICT:
         return LAST_PRICE_DICT
+
     prices_comm = [
         "hledger",
         *files_comm,
@@ -42,23 +43,31 @@ def get_last_price_dict(files_comm: list[str]):
     prices_str = prices_proc.stdout.decode("utf8")
     if not prices_str:
         return {}
+
     for d_string, commodity, price in re.findall(
-        r'(\d+-\d+-\d+) "?([^\s"]+)"?[^\d]*(\d+\.\d+)', prices_str
+        r'(\d+-\d+-\d+) "?([^\s"]+)"?[^\d]*(\d+(?:\.\d+)?)', prices_str
     ):
         comm = commodity.upper()
-        if comm not in LAST_PRICE_DICT:
-            last_date = datetime.strptime(d_string, "%Y-%m-%d").date()
-            LAST_PRICE_DICT[comm] = (last_date, float(price))
+
+        # Try to get decimal format from commodity_directive if available
+        if commodity_directive:
+            try:
+                fmt = commodity_directive.get_format(comm)
+                price_value = float(price.replace(fmt.decimal_mark, "."))
+            except Exception:
+                price_value = float(price)
         else:
-            new_date = datetime.strptime(d_string, "%Y-%m-%d").date()
-            old_date, _ = LAST_PRICE_DICT[comm]
-            if new_date > old_date:
-                LAST_PRICE_DICT[comm] = (new_date, float(price))
+            price_value = float(price)
+
+        last_date = datetime.strptime(d_string, "%Y-%m-%d").date()
+        if comm not in LAST_PRICE_DICT or last_date > LAST_PRICE_DICT[comm][0]:
+            LAST_PRICE_DICT[comm] = (last_date, price_value)
+
     return LAST_PRICE_DICT
 
 
-def get_last_price(files_comm: list[str], commodity: str):
-    price_dict = get_last_price_dict(files_comm)
+def get_last_price(files_comm: list[str], commodity: str, commodity_directive=None):
+    price_dict = get_last_price_dict(files_comm, commodity_directive)
     output = price_dict.get(commodity.upper(), (None, None))
     return output
 
@@ -111,12 +120,13 @@ class Info:
         """)
 
         if self.market_date and self.market_price:
+            fmt = self.commodity_directive.get_format(self.commodity)
             info_txt += dedent(f"""\
-                Market Price:  {info["mkt_price"]}
-                Market Amount: {info["mkt_amount"]}
-                Market Profit: {info["mkt_profit"]}
+                Market Price:  {format_number(info["mkt_price"], fmt)}
+                Market Amount: {format_number(info["mkt_amount"], fmt)}
+                Market Profit: {format_number(info["mkt_profit"], fmt)}
                 Market Date:   {info["mkt_date"]}
-                Xirr:          {info["xirr"]} (APR 30/360US)
+                Xirr:          {format_number(info["xirr"], fmt)} (APR 30/360US)
             """)
         else:
             info_txt += "\nMarket Data not available"
