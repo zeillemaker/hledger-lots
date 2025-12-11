@@ -6,6 +6,7 @@ from pathlib import Path
 import yfinance as yf
 import locale
 from requests.exceptions import HTTPError
+from decimal import Decimal
 
 from .commodity_tag import CommodityDirective, CommodityTag
 from .hl import hledger2txn
@@ -82,9 +83,12 @@ class YahooPrices:
         prices_list = []
         for price in prices:
             fmt = self.commodity_directive.get_format(price.name)
-            value_str = format_number(price.price, fmt)
+            # Format numeric value using commodity separators but do not include
+            # the currency symbol — we emit the currency code as a separate token
+            value_str = format_number(price.price, fmt, include_symbol=False)
+            # Per hledger price directive style: P <date> <commodity> <currency> <value>
             prices_list.append(
-                f"P {price.date.strftime('%Y-%m-%d')} {price.name} {value_str} {price.cur}"
+                f"P {price.date.strftime('%Y-%m-%d')} {price.name} {price.cur} {value_str}"
             )
         return "\n".join(prices_list)
 
@@ -165,11 +169,12 @@ class YahooPrices:
                         continue
 
                 try:
-                    close_value = float(row[close_col])
+                    # Preserve numeric precision by converting via string -> Decimal
+                    close_value = Decimal(str(row[close_col]))
                 except Exception:
                     # sometimes row is a scalar if single-col df; handle that
                     try:
-                        close_value = float(row)
+                        close_value = Decimal(str(row))
                     except Exception:
                         continue
 

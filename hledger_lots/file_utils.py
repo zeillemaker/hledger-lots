@@ -1,6 +1,7 @@
 # hledger_lots/file_utils.py
 from pathlib import Path
 from .types import AdjustedTxn
+from decimal import Decimal, ROUND_HALF_UP
 
 def find_all_included_files(filename, seen=None):
     if seen is None:
@@ -25,36 +26,61 @@ def find_all_included_files(filename, seen=None):
 
     return files
 
-def format_number(value: float, fmt: dict) -> str:
+def format_number(value: float | Decimal, fmt: dict | None, include_symbol: bool = True) -> str:
     """
-    Format a number according to a commodity's format.
-    fmt should include:
-        - decimal_mark: ',' or '.'
-        - thousands_sep: '.' or ',' or "'"
-        - currency_symbol: str or None
-        - currency_position: 'left' or 'right'
-        - space: bool
+    Format a number according to a commodity's format (hledger semantics).
+
+    Required fmt keys (will be defaulted if missing):
+        decimal_mark, thousands_sep, currency_symbol, currency_position, space, precision
     """
-    int_part, _, frac_part = f"{abs(value):.20f}".rstrip("0").rstrip(".").partition(".")
+    # Default format (used when no commodity format directive exists)
+    if fmt is None:
+        fmt = {
+            "decimal_mark": ".",
+            "thousands_sep": ",",
+            "currency_symbol": None,
+            "currency_position": "right",
+            "space": True,
+            "precision": 2,
+        }
 
-    # Add thousands separator
-    int_part = f"{int(int_part):,}".replace(",", fmt["thousands_sep"])
+    # Convert to Decimal early to preserve exactness
+    if not isinstance(value, Decimal):
+        value = Decimal(str(value))
 
-    # Combine with decimal mark
+    # Use the full precision supplied by the Decimal (do not quantize)
+    # Format as fixed-point to preserve all fractional digits from source
+    s = format(value.copy_abs(), "f")
+    neg = s.startswith("-")
+    if neg:
+        s = s[1:]
+
+    int_part, _, frac_part = s.partition(".")
+
+    # Add thousands separator if requested
+    thousands = fmt.get("thousands_sep", "")
+    if thousands:
+        int_part_rev = int_part[::-1]
+        grouped = [int_part_rev[i : i + 3] for i in range(0, len(int_part_rev), 3)]
+        int_part = thousands.join(grouped)[::-1]
+
+    # Recombine number with decimal mark (preserve all fractional digits)
     if frac_part:
-        number = f"{int_part}{fmt['decimal_mark']}{frac_part}"
+        number = f"{int_part}{fmt.get('decimal_mark', '.')}{frac_part}"
     else:
         number = int_part
 
-    # Attach currency symbol
-    if fmt.get("currency_symbol"):
-        if fmt["currency_position"] == "left":
-            number = f"{fmt['currency_symbol']}{' ' if fmt['space'] else ''}{number}"
-        else:
-            number = f"{number}{' ' if fmt['space'] else ''}{fmt['currency_symbol']}"
 
-    # Add negative sign
-    if value < 0:
+    # Apply currency symbol if present and requested
+    sym = fmt.get("currency_symbol")
+    if include_symbol and sym:
+        if fmt.get("currency_position", "right") == "left":
+            number = f"{sym}{' ' if fmt.get('space') else ''}{number}"
+        else:
+            number = f"{number}{' ' if fmt.get('space') else ''}{sym}"
+
+    # Reapply negative sign
+    if neg:
         number = f"-{number}"
 
     return number

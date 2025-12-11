@@ -74,10 +74,30 @@ class CommodityDirective:
         """
         lines = self._all_lines_for_commodity(commodity)
         fmt_line = None
+        numeric_candidate = None
         for line in lines:
-            if line.strip().startswith("format"):
-                fmt_line = line.strip()[6:].strip()
-                break
+            # Try to find an explicit "format" comment first (e.g. ; format €1.234,56)
+            # The comment part (after ';') may contain the word 'format'
+            if ";" in line:
+                parts = line.split(";", 1)
+                comment_part = parts[1].strip()
+                if comment_part.startswith("format"):
+                    fmt_line = comment_part[6:].strip()
+                    break
+                # If comment didn't include a format token, keep a numeric candidate from the main part
+                main_part = parts[0]
+            else:
+                main_part = line
+
+            # Look for a numeric token in the main part before the commodity name, e.g. "commodity 1.000,00000 HBAR"
+            m = re.search(r"([\d.,]+)", main_part)
+            if m:
+                numeric_candidate = m.group(1)
+
+        # If we didn't find an explicit format comment, but we found a numeric candidate,
+        # use it as the fmt_line to parse separators/precision.
+        if fmt_line is None and numeric_candidate:
+            fmt_line = numeric_candidate
 
         # Defaults
         fmt = {
@@ -86,6 +106,8 @@ class CommodityDirective:
             "currency_symbol": None,
             "currency_position": "right",
             "space": True,
+            # Default precision when no explicit format directive exists
+            "precision": 2,
         }
 
         if not fmt_line:
@@ -95,7 +117,11 @@ class CommodityDirective:
         match = re.search(r'([^\d]*)([\d.,]+)\s*([^\d]*)', fmt_line)
         if match:
             left, number, right = match.groups()
-            fmt["currency_symbol"] = (left or right or None).strip() or None
+            # Safely compute currency symbol: prefer left, then right; strip and
+            # coerce empty strings to None.
+            sym_candidate = left or right
+            fmt_val = sym_candidate.strip() if sym_candidate and isinstance(sym_candidate, str) else None
+            fmt["currency_symbol"] = fmt_val or None
             fmt["currency_position"] = "left" if left else "right"
 
             if "," in number and "." in number:
@@ -109,5 +135,11 @@ class CommodityDirective:
                 fmt["thousands_sep"] = ","
 
             fmt["space"] = bool(fmt["currency_symbol"])
+
+            # Determine precision (digits after decimal mark) when present
+            if fmt["decimal_mark"] in number:
+                fmt["precision"] = len(number.split(fmt["decimal_mark"])[1])
+            else:
+                fmt["precision"] = 0
 
         return fmt
