@@ -149,4 +149,4 @@ cython_debug/
 docs/unit_tests/*
 /docs/.markdown-preview.html
 
-.vscode/*
+/.vscode
