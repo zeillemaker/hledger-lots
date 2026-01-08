@@ -12,6 +12,7 @@ from .avg_info import AllAvgInfo
 from .fifo_info import AllFifoInfo
 from .info import LotsInfo
 from .utils import get_files_comm
+from .commodity_tag import CommodityDirective
 
 
 class PromptError(BaseException):
@@ -135,6 +136,7 @@ class Prompt:
         self.avg_cost = avg_cost
 
         self.files_comm = get_files_comm(file)
+        self.commodity_directive = CommodityDirective(self.file)
         self.infos = self.get_infos()
         self.commodities = [info["comm"] for info in self.get_infos()]
 
@@ -215,8 +217,20 @@ class Prompt:
         return answer_str
 
     def ask_price(self, info: LotsInfo):
-        cost_str = info["avg_cost"].replace(",", ".")
-        cost = float(cost_str)
+        # Parse avg_cost using commodity format (handle thousands_sep and decimal_mark)
+        cost_str = info["avg_cost"]
+        try:
+            fmt = self.commodity_directive.get_format(info["comm"])
+            thousands = fmt.get("thousands_sep", "") or ""
+            decimal_mark = fmt.get("decimal_mark", ".") or "."
+            p = cost_str
+            if thousands:
+                p = p.replace(thousands, "")
+            if decimal_mark != ".":
+                p = p.replace(decimal_mark, ".")
+            cost = float(p)
+        except Exception:
+            cost = float(cost_str.replace(",", "."))
 
         answer_str: str = questionary.text(
             f"Price (avg cost: {cost})",
@@ -226,7 +240,20 @@ class Prompt:
         return answer_str
 
     def ask_total(self, qtty: float, info: LotsInfo):
-        available = qtty * float(info["avg_cost"])
+        # Compute available by parsing avg_cost with commodity format
+        avg_cost_str = info["avg_cost"]
+        try:
+            fmt = self.commodity_directive.get_format(info["comm"])
+            thousands = fmt.get("thousands_sep", "") or ""
+            decimal_mark = fmt.get("decimal_mark", ".") or "."
+            p = avg_cost_str
+            if thousands:
+                p = p.replace(thousands, "")
+            if decimal_mark != ".":
+                p = p.replace(decimal_mark, ".")
+            available = qtty * float(p)
+        except Exception:
+            available = qtty * float(avg_cost_str.replace(",", "."))
         available_str = f"{available:,.2f}"
 
         answer_str: str = questionary.text(

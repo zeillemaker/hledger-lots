@@ -45,7 +45,7 @@ def get_last_price_dict(files_comm: list[str], commodity_directive=None):
         return {}
 
     for d_string, commodity, price in re.findall(
-        r'(\d+-\d+-\d+) "?([^\s"]+)"?[^\d]*(\d+(?:\.\d+)?)', prices_str
+        r'(\d+-\d+-\d+) "?([^\s"]+)"?[^\d]*(\S+)', prices_str
     ):
         comm = commodity.upper()
 
@@ -53,7 +53,15 @@ def get_last_price_dict(files_comm: list[str], commodity_directive=None):
         if commodity_directive:
             try:
                 fmt = commodity_directive.get_format(comm)
-                price_value = float(price.replace(fmt.decimal_mark, "."))
+                # fmt is a dict with keys 'decimal_mark' and 'thousands_sep'
+                thousands = fmt.get("thousands_sep", "") or ""
+                decimal_mark = fmt.get("decimal_mark", ".") or "."
+                p = price
+                if thousands:
+                    p = p.replace(thousands, "")
+                if decimal_mark != ".":
+                    p = p.replace(decimal_mark, ".")
+                price_value = float(p)
             except Exception:
                 price_value = float(price)
         else:
