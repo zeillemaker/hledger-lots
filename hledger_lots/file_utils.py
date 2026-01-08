@@ -26,7 +26,14 @@ def find_all_included_files(filename, seen=None):
 
     return files
 
-def format_number(value: float | Decimal, fmt: dict | None, include_symbol: bool = True) -> str:
+def format_number(
+    value: float | Decimal,
+    fmt: dict | None,
+    include_symbol: bool = True,
+    min_precision: int | None = None,
+    precision: int | None = None,
+    trim_trailing_to_min: bool = False,
+) -> str:
     """
     Format a number according to a commodity's format (hledger semantics).
 
@@ -48,14 +55,52 @@ def format_number(value: float | Decimal, fmt: dict | None, include_symbol: bool
     if not isinstance(value, Decimal):
         value = Decimal(str(value))
 
-    # Use the full precision supplied by the Decimal (do not quantize)
-    # Format as fixed-point to preserve all fractional digits from source
+    # Determine desired precision. If `precision` is provided, use it
+    # exactly. Otherwise compute a precision that is the maximum of:
+    # - the format's configured precision (fmt['precision'])
+    # - the actual fractional digits present in the input value
+    # - the optional `min_precision` requested by the caller
+    # This preserves additional fractional digits while enforcing a
+    # minimum number of decimals.
+    s_raw = format(value.copy_abs(), "f")
+    _, _, frac_raw = s_raw.partition(".")
+    frac_len = len(frac_raw) if frac_raw else 0
+
+    if precision is None:
+        base_precision = fmt.get("precision", 2)
+        if min_precision is not None:
+            desired_precision = max(base_precision, min_precision, frac_len)
+        else:
+            desired_precision = max(base_precision, frac_len)
+    else:
+        desired_precision = precision
+
+    # Quantize value to the desired precision using ROUND_HALF_UP, then
+    # format as fixed-point.
+    quant = Decimal(10) ** (-desired_precision)
+    value = value.quantize(quant, rounding=ROUND_HALF_UP)
     s = format(value.copy_abs(), "f")
     neg = s.startswith("-")
     if neg:
         s = s[1:]
 
     int_part, _, frac_part = s.partition(".")
+
+    # If the caller did not request an exact `precision`, trim trailing
+    # zeros from the fractional part while preserving at least the
+    # minimum number of decimals (min_keep). This produces outputs like
+    # `75.221,6953125000` -> `75.221,6953125` but keeps `77.869,00`.
+    if precision is None and frac_part:
+        base_precision = fmt.get("precision", 2)
+        if trim_trailing_to_min:
+            # Trim to the caller-requested minimum (but never less than 2)
+            min_keep = max(2, min_precision or 0)
+        else:
+            min_keep = max(base_precision, min_precision or 0)
+
+        # remove trailing zeros but keep at least min_keep digits
+        while frac_part.endswith("0") and len(frac_part) > min_keep:
+            frac_part = frac_part[:-1]
 
     # Add thousands separator if requested
     thousands = fmt.get("thousands_sep", "")

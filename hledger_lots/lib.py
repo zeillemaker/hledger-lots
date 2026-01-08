@@ -73,6 +73,14 @@ def adjust_commodity(comm: str):
     return adjusted
 
 
+# Backwards-compatible wrapper for get_xirr (historically exposed from lib)
+from .utils import get_xirr as _utils_get_xirr
+
+
+def get_xirr(sell_price: float, sell_date: date, txns: list[AdjustedTxn]):
+    return _utils_get_xirr(sell_price, sell_date, txns)
+
+
 def get_sell_comm(
     commodity: str,
     no_desc: str,

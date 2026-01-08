@@ -85,7 +85,15 @@ class YahooPrices:
             fmt = self.commodity_directive.get_format(price.name)
             # Format numeric value using commodity separators but do not include
             # the currency symbol — we emit the currency code as a separate token
-            value_str = format_number(price.price, fmt, include_symbol=False)
+            # Ensure at least 2 decimal places for price directives
+            # Ensure at least 2 decimal places (display cents)
+            value_str = format_number(
+                price.price,
+                fmt,
+                include_symbol=False,
+                min_precision=2,
+                trim_trailing_to_min=True,
+            )
             # Per hledger price directive style: P <date> <commodity> <currency> <value>
             prices_list.append(
                 f"P {price.date.strftime('%Y-%m-%d')} {price.name} {price.cur} {value_str}"

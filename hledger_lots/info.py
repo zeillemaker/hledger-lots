@@ -30,8 +30,9 @@ LAST_PRICE_DICT: dict[str, tuple[date, float]] = {}
 
 
 def get_last_price_dict(files_comm: list[str], commodity_directive=None):
-    if LAST_PRICE_DICT:
-        return LAST_PRICE_DICT
+    # Recompute prices for the given files. Clear any previous cached
+    # prices to avoid returning stale values from earlier test runs.
+    LAST_PRICE_DICT.clear()
 
     prices_comm = [
         "hledger",

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from .avg import get_avg_cost
+from .hl import hledger2txn
 from .info import AllInfo, Info, LotsInfo
 from .lib import dt_list2table
 from .types import AdjustedTxn, Txn
@@ -11,12 +12,23 @@ class AvgInfo(Info):
         self,
         journals: tuple[str, ...],
         commodity: str,
-        txns: list[AdjustedTxn],
-        check: bool,
+        txns_or_check: list[AdjustedTxn] | bool,
+        check: bool | None = None,
         no_desc: str | None = None,
     ):
+        # Backwards-compatible constructor: either pass (journals, commodity, txns, check)
+        # or the legacy form (journals, commodity, check) where txns will be fetched.
+        if isinstance(txns_or_check, (list, tuple)):
+            txns = txns_or_check
+            if check is None:
+                raise TypeError("missing required argument: 'check'")
+            check_flag = check
+        else:
+            check_flag = bool(txns_or_check)
+            txns = hledger2txn(journals, commodity)
+
         super().__init__(journals, commodity, txns, no_desc)
-        self.check = check
+        self.check = check_flag
         self.avg_lots = get_avg_cost(self.txns, self.check)
         self.table = dt_list2table(self.avg_lots)
 

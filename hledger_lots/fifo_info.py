@@ -2,6 +2,7 @@ from datetime import datetime
 
 from .checks import MultipleBaseCurrencies
 from .fifo import get_lots
+from .hl import hledger2txn
 from .info import AllInfo, Info, LotsInfo
 from .lib import dt_list2table, get_avg_fifo
 from .types import AdjustedTxn, Txn
@@ -12,14 +13,25 @@ class FifoInfo(Info):
         self,
         journals: tuple[str, ...],
         commodity: str,
-        commodity_txns: list[AdjustedTxn],
-        check: bool,
+        commodity_txns_or_check: list[AdjustedTxn] | bool,
+        check: bool | None = None,
         no_desc: str | None = None,
     ):
-        super().__init__(journals, commodity, commodity_txns, no_desc)
-        self.check = check
+        # Backwards-compatible constructor: either pass (journals, commodity, txns, check)
+        # or the legacy form (journals, commodity, check) where txns will be fetched.
+        if isinstance(commodity_txns_or_check, (list, tuple)):
+            commodity_txns = commodity_txns_or_check
+            if check is None:
+                raise TypeError("missing required argument: 'check'")
+            check_flag = check
+        else:
+            check_flag = bool(commodity_txns_or_check)
+            commodity_txns = hledger2txn(journals, commodity)
 
-        self.lots = get_lots(self.txns, check)
+        super().__init__(journals, commodity, commodity_txns, no_desc)
+        self.check = check_flag
+
+        self.lots = get_lots(self.txns, self.check)
         self.last_buy_date = self.lots[-1].date if len(self.lots) > 0 else None
 
         self.table = dt_list2table(self.lots)

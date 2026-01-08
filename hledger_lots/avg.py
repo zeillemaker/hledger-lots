@@ -97,7 +97,7 @@ def avg_sell(
     ; xirr:{xirr:.2f}% annual percent rate 30/360US
     {cash_account}    {value:.2f} {base_curr}
     {comm_account}    {qtty * -1} {adj_comm} @ {cost} {base_curr}
-    {revenue_account}"""
+    {revenue_account}    {format((-(Decimal(str(value)) - Decimal(str(cost)) * Decimal(str(qtty))).normalize()), 'f')} {base_curr}"""
 
     comm = ["hledger", "-f-", "print", "--explicit"]
     txn_proc = subprocess.run(comm, input=txn_hl.encode(), capture_output=True)
