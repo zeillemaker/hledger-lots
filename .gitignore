@@ -148,3 +148,5 @@ cython_debug/
 /.pdbrc
 docs/unit_tests/*
 /docs/.markdown-preview.html
+
+.vscode/*
