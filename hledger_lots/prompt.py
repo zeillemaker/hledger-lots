@@ -165,9 +165,13 @@ class Prompt:
     def get_infos(self):
         txns = all_commodity_txns(self.file, self.no_desc or "")
         if self.avg_cost:
-            infos = AllAvgInfo(self.file, self.no_desc or "", txns, self.check)
+            infos = AllAvgInfo(
+                self.file, self.no_desc or "", txns, self.check, commodity_directive=self.commodity_directive
+            )
         else:
-            infos = AllFifoInfo(self.file, self.no_desc or "", txns, self.check)
+            infos = AllFifoInfo(
+                self.file, self.no_desc or "", txns, self.check, commodity_directive=self.commodity_directive
+            )
 
         valid_infos = [info for info in infos.infos if float(info["qtty"]) > 0]
         return valid_infos

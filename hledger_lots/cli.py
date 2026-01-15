@@ -6,6 +6,7 @@ from hledger_lots.hl import all_commodity_txns, hledger2txn
 
 from .avg_info import AllAvgInfo, AvgInfo
 from .fifo_info import AllFifoInfo, FifoInfo
+from .commodity_tag import CommodityDirective
 from .lib import get_default_file, get_file_from_stdin
 from .utils import get_files_comm
 from .options import Options, get_options
@@ -96,10 +97,15 @@ def buy(obj: Obj):
 
     commodity = prompt_buy.info["comm"]
     txns = hledger2txn(file, commodity)
+    commodity_directive = CommodityDirective(file)
     if opt.avg_cost:
-        info = AvgInfo(file, commodity, txns, opt.check)
+        info = AvgInfo(
+            file, commodity, txns, opt.check, None, commodity_directive=commodity_directive
+        )
     else:
-        info = FifoInfo(file, commodity, txns, opt.check)
+        info = FifoInfo(
+            file, commodity, txns, opt.check, None, commodity_directive
+        )
 
     click.echo(info.table)
     click.echo(info.info_txt)
@@ -137,10 +143,15 @@ def sell(obj: Obj):
 
     commodity = prompt_sell.info["comm"]
     txns = hledger2txn(file, commodity)
+    commodity_directive = CommodityDirective(file)
     if opt.avg_cost:
-        info = AvgInfo(file, commodity, txns, opt.check)
+        info = AvgInfo(
+            file, commodity, txns, opt.check, None, commodity_directive=commodity_directive
+        )
     else:
-        info = FifoInfo(file, commodity, txns, opt.check)
+        info = FifoInfo(
+            file, commodity, txns, opt.check, None, commodity_directive
+        )
 
     click.echo(info.table)
     click.echo(info.info_txt)
@@ -167,10 +178,15 @@ def view(obj: Obj, commodity: str):
     opt = obj["opt"]
 
     txns = hledger2txn(file, commodity)
+    commodity_directive = CommodityDirective(file)
     if opt.avg_cost:
-        info = AvgInfo(file, commodity, txns, opt.check, opt.no_desc)
+        info = AvgInfo(
+            file, commodity, txns, opt.check, opt.no_desc, commodity_directive=commodity_directive
+        )
     else:
-        info = FifoInfo(file, commodity, txns, opt.check, opt.no_desc)
+        info = FifoInfo(
+            file, commodity, txns, opt.check, opt.no_desc, commodity_directive
+        )
 
     click.echo(info.table)
     click.echo(info.info_txt)
@@ -196,11 +212,15 @@ def list_commodities(obj: Obj, output_format: str):
     opt = obj["opt"]
 
     txns = all_commodity_txns(file, opt.no_desc)
-    lots_info = (
-        AllAvgInfo(file, opt.no_desc, txns, opt.check)
-        if opt.avg_cost
-        else AllFifoInfo(file, opt.no_desc, txns, opt.check)
-    )
+    commodity_directive = CommodityDirective(file)
+    if opt.avg_cost:
+        lots_info = AllAvgInfo(
+            file, opt.no_desc, txns, opt.check, commodity_directive=commodity_directive
+        )
+    else:
+        lots_info = AllFifoInfo(
+            file, opt.no_desc, txns, opt.check, commodity_directive=commodity_directive
+        )
 
     if output_format == "pretty":
         table = lots_info.infos_table("mixed_grid", exclude_no_quantity=True)

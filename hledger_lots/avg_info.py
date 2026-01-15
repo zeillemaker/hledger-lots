@@ -15,6 +15,7 @@ class AvgInfo(Info):
         txns_or_check: list[AdjustedTxn] | bool,
         check: bool | None = None,
         no_desc: str | None = None,
+        commodity_directive=None,
     ):
         # Backwards-compatible constructor: either pass (journals, commodity, txns, check)
         # or the legacy form (journals, commodity, check) where txns will be fetched.
@@ -27,7 +28,7 @@ class AvgInfo(Info):
             check_flag = bool(txns_or_check)
             txns = hledger2txn(journals, commodity)
 
-        super().__init__(journals, commodity, txns, no_desc)
+        super().__init__(journals, commodity, txns, no_desc, commodity_directive)
         self.check = check_flag
         self.avg_lots = get_avg_cost(self.txns, self.check)
         self.table = dt_list2table(self.avg_lots)
@@ -44,20 +45,23 @@ class AvgInfo(Info):
         last_buy_date = datetime.strptime(self.avg_lots[-1].date, "%Y-%m-%d").date()
         xirr = self.get_lots_xirr(last_buy_date)
 
-        if self.market_price and self.market_date and xirr:
+        if self.market_price and self.market_date:
             market_price_str = f"{self.market_price:,.4f}"
             market_amount = self.market_price * qtty
             market_amount_str = f"{market_amount:,.2f}"
             market_profit = market_amount - amount
             market_profit_str = f"{market_profit:,.2f}"
             market_date = self.market_date.strftime("%Y-%m-%d")
-            xirr_str = f"{xirr:,.4f}%"
+            if xirr is not None:
+                xirr_str = f"{xirr:,.4f}%"
+            else:
+                xirr_str = "N/A"
         else:
             market_amount_str = ""
             market_profit_str = ""
             market_date = ""
             market_price_str = ""
-            xirr_str = ""
+            xirr_str = "N/A"
 
         return LotsInfo(
             comm=commodity,
@@ -88,14 +92,21 @@ class AllAvgInfo(AllInfo):
         no_desc: str,
         all_txns: dict[str, list[AdjustedTxn]],
         check: bool,
+        commodity_directive=None,
     ):
         super().__init__(journals, no_desc)
+        self.commodity_directive = commodity_directive
         self.check = check
         self.all_txns = all_txns
 
     def get_info(self, commodity: str):
         avg_obj = AvgInfo(
-            self.journals, commodity, self.all_txns[commodity.upper()], self.check
+            self.journals,
+            commodity,
+            self.all_txns[commodity.upper()],
+            self.check,
+            None,
+            commodity_directive=getattr(self, "commodity_directive", None),
         )
         if len(avg_obj.txns) == 0:
             return
@@ -110,7 +121,14 @@ class AllAvgInfo(AllInfo):
 
     @property
     def infos_with_qtty(self):
-        return [x for x in self.infos if int(float(x["qtty"]) * 100) > 0]
+        result = []
+        for x in self.infos:
+            try:
+                if float(x["qtty"]) > 0.0:
+                    result.append(x)
+            except Exception:
+                continue
+        return result
 
     def infos_table(self, output_format: str, exclude_no_quantity=False):
         if exclude_no_quantity:

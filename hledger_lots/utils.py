@@ -1,5 +1,6 @@
 # utils.py
 from .types import AdjustedTxn
+import pyxirr
 from pyxirr import xirr, DayCount
 from datetime import date
 from .file_utils import find_all_included_files
@@ -31,5 +32,15 @@ def get_xirr(
     sell_date_txt = sell_date.strftime("%Y-%m-%d")
     dates = [*dates, sell_date_txt]
     amts = [*buy_amts, -total_qtty * sell_price]
-    sell_xirr = xirr(dates, amts, day_count=DayCount.THIRTY_U_360)
-    return sell_xirr
+    try:
+        sell_xirr = xirr(dates, amts, day_count=DayCount.THIRTY_U_360)
+        return sell_xirr
+    except pyxirr.InvalidPaymentsError:
+        # xirr requires at least one positive and one negative payment.
+        # Preserve original behaviour for the special case where caller
+        # explicitly passed a zero sell price (tests expect an exception).
+        if sell_price == 0:
+            raise
+        # For other cases (e.g. market lookup with no realised opposite
+        # payments), return None to indicate XIRR cannot be computed.
+        return None

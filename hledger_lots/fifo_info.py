@@ -16,6 +16,7 @@ class FifoInfo(Info):
         commodity_txns_or_check: list[AdjustedTxn] | bool,
         check: bool | None = None,
         no_desc: str | None = None,
+        commodity_directive=None,
     ):
         # Backwards-compatible constructor: either pass (journals, commodity, txns, check)
         # or the legacy form (journals, commodity, check) where txns will be fetched.
@@ -28,7 +29,9 @@ class FifoInfo(Info):
             check_flag = bool(commodity_txns_or_check)
             commodity_txns = hledger2txn(journals, commodity)
 
-        super().__init__(journals, commodity, commodity_txns, no_desc)
+        super().__init__(
+            journals, commodity, commodity_txns, no_desc, commodity_directive
+        )
         self.check = check_flag
 
         self.lots = get_lots(self.txns, self.check)
@@ -54,7 +57,7 @@ class FifoInfo(Info):
         else:
             xirr = 0
 
-        if self.market_price and self.market_date and xirr:
+        if self.market_price and self.market_date:
             market_price_str = f"{self.market_price:,.4f}"
             market_amount = self.market_price * qtty
             market_amount_str = f"{market_amount:,.2f}"
@@ -62,13 +65,17 @@ class FifoInfo(Info):
             market_profit_str = f"{market_profit:,.2f}"
             market_date = self.market_date.strftime("%Y-%m-%d")
 
-            xirr_str = f"{xirr:,.4f}%"
+            # Only format xirr if it's a numeric value; otherwise leave blank
+            if xirr is not None:
+                xirr_str = f"{xirr:,.4f}%"
+            else:
+                xirr_str = "N/A"
         else:
             market_amount_str = ""
             market_profit_str = ""
             market_date = ""
             market_price_str = ""
-            xirr_str = ""
+            xirr_str = "N/A"
 
         return LotsInfo(
             comm=commodity,
@@ -98,10 +105,12 @@ class AllFifoInfo(AllInfo):
         no_desc: str,
         commodity_txns: dict[str, list[AdjustedTxn]],
         check: bool,
+        commodity_directive=None,
     ):
         super().__init__(journals, no_desc)
         self.check = check
         self.commodity_txns = commodity_txns
+        self.commodity_directive = commodity_directive
 
     def get_info(self, commodity: str):
         txns = self.commodity_txns.get(commodity, [])
@@ -111,7 +120,13 @@ class AllFifoInfo(AllInfo):
             return None
 
         if len(lots) > 0:
-            lot_info = FifoInfo(self.journals, commodity, txns, self.check).get_info()
+            lot_info = FifoInfo(
+                self.journals,
+                commodity,
+                txns,
+                self.check,
+                commodity_directive=getattr(self, "commodity_directive", None),
+            ).get_info()
             return lot_info
 
     @property
@@ -122,7 +137,17 @@ class AllFifoInfo(AllInfo):
 
     @property
     def infos_with_qtty(self):
-        return [x for x in self.infos if int(float(x["qtty"]) * 100) > 0]
+        # Include any commodity with a strictly positive quantity.
+        # Previous implementation multiplied by 100 which could filter
+        # out very small quantities (e.g. BTC). Use a direct numeric check.
+        result = []
+        for x in self.infos:
+            try:
+                if float(x["qtty"]) > 0.0:
+                    result.append(x)
+            except Exception:
+                continue
+        return result
 
     def infos_table(self, output_format: str, exclude_no_quantity=False):
         if exclude_no_quantity:

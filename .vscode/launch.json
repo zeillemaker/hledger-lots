@@ -6,20 +6,47 @@
     "configurations": [
 
         {
-            "name": "Debug hledger-lots buy",
+            "name": "buy",
             "type": "debugpy",
             "request": "launch",
             "module": "hledger_lots.__main__",
-            "args": ["buy"],
+            "args": ["-f", "~/Documents/administratie/financieel/lots.ledger", "buy"],
             "console": "integratedTerminal",
             "justMyCode": false
         },
         {
-            "name": "Debug hledger-lots prices",
+            "name": "sell",
             "type": "debugpy",
             "request": "launch",
             "module": "hledger_lots.__main__",
-            "args": ["prices"],
+            "args": ["-f", "~/Documents/administratie/financieel/lots.ledger", "sell"],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "prices",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "hledger_lots.__main__",
+            "args": ["-f", "~/Documents/administratie/financieel/lots.ledger", "prices"],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "list",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "hledger_lots.__main__",
+            "args": ["-f", "~/Documents/administratie/financieel/lots.ledger", "list"],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "view",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "hledger_lots.__main__",
+            "args": ["-f", "~/Documents/administratie/financieel/lots.ledger", "view", "BTC"],
             "console": "integratedTerminal",
             "justMyCode": false
         }

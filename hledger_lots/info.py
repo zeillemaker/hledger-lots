@@ -98,6 +98,7 @@ class Info:
         commodity: str,
         txns: list[AdjustedTxn],
         no_desc: str | None = None,
+        commodity_directive=None,
     ) -> None:
         self.journals = journals
         all_files = []
@@ -109,8 +110,13 @@ class Info:
         self.commodity = commodity.upper()
         self.txns = txns
 
+        # store commodity directive (formatting) for later use
+        self.commodity_directive = commodity_directive
+
         self.has_txn = len(self.txns) > 0
-        self.last_price = get_last_price(self.files_comm, commodity)
+        self.last_price = get_last_price(
+            self.files_comm, commodity, commodity_directive
+        )
         self.market_date, self.market_price = self.last_price
 
     def get_lots_xirr(self, last_buy_date: date):
