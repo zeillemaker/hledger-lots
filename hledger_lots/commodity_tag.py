@@ -128,7 +128,10 @@ class CommodityDirective:
             fmt["currency_symbol"] = fmt_val or None
             fmt["currency_position"] = "left" if left else "right"
 
-            if "," in number and "." in number:
+            if "'" in number and "." in number:
+                fmt["decimal_mark"] = "."
+                fmt["thousands_sep"] = "'"
+            elif "," in number and "." in number:
                 fmt["decimal_mark"] = ","
                 fmt["thousands_sep"] = "."
             elif "," in number:
@@ -145,5 +148,11 @@ class CommodityDirective:
                 fmt["precision"] = len(number.split(fmt["decimal_mark"])[1])
             else:
                 fmt["precision"] = 0
+
+        # Override separators with global defaults if set
+        if self.default_decimal_mark is not None:
+            fmt["decimal_mark"] = self.default_decimal_mark
+        if self.default_thousands_sep is not None:
+            fmt["thousands_sep"] = self.default_thousands_sep
 
         return fmt

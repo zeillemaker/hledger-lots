@@ -41,6 +41,17 @@ class HledgerVars:
 
         key = var_key_value[0].strip(" \n")
         value = var_key_value[1].strip().strip('"')
+        
+        # Map word names to symbols
+        if value == 'comma':
+            value = ','
+        elif value == 'dot' or value == 'period':
+            value = '.'
+        elif value == 'apostrophe' or value == 'quote':
+            value = "'"
+        elif value == 'space':
+            value = ' '
+        
         result = (key, value)
         return result
 
