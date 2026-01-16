@@ -25,7 +25,7 @@ class Price:
 class YahooPrices:
     TAG = "yahoo_ticker"
 
-    def __init__(self, files: tuple[str, ...]) -> None:
+    def __init__(self, files: tuple[str, ...], options: Options | None = None) -> None:
         self.files = files
         self.files_comm = get_files_comm(files)
 
@@ -38,7 +38,7 @@ class YahooPrices:
             all_files.extend(find_all_included_files(f))
 
         # Save the CommodityDirective object for later use
-        self.commodity_directive = CommodityDirective(all_files)
+        self.commodity_directive = CommodityDirective(all_files, options)
         self.commodities = self.commodity_directive.get_commodity_tag(self.TAG)
 
 

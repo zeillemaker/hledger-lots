@@ -1,6 +1,8 @@
 import re
 from typing import TypedDict
 
+from .options import Options
+
 
 class CommodityTag(TypedDict):
     commodity: str
@@ -21,9 +23,11 @@ def get_comment_tag_value(comment: str, tag: str) -> str:
 
 
 class CommodityDirective:
-    def __init__(self, files: tuple[str, ...]):
+    def __init__(self, files: tuple[str, ...], options: Options | None = None):
         self.files = files
         self.rows = self.get_commodities_rows()
+        self.default_decimal_mark = options.decimal_mark if options and options.decimal_mark else "."
+        self.default_thousands_sep = options.thousands_sep if options and options.thousands_sep else ","
 
     def get_commodities_rows(self) -> list[str]:
         rows = []
@@ -101,8 +105,8 @@ class CommodityDirective:
 
         # Defaults
         fmt = {
-            "decimal_mark": ".",
-            "thousands_sep": ",",
+            "decimal_mark": self.default_decimal_mark,
+            "thousands_sep": self.default_thousands_sep,
             "currency_symbol": None,
             "currency_position": "right",
             "space": True,

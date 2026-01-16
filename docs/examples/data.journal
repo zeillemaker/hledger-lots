@@ -1,4 +1,4 @@
-#+hledger-lots avg_cost:false, check:true
+#+hledger-lots avg_cost:false, check:true, decimal_mark:,, thousands_sep:.
 #+hledger-lots no_desc:
 
 #+args buy_aapl:bal desc:"Buy AAPL"

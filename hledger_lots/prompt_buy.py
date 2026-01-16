@@ -32,8 +32,9 @@ class PromptBuy(prompt.Prompt):
         avg_cost: bool,
         check: bool,
         no_desc: str | None = None,
+        options: Options | None = None,
     ) -> None:
-        super().__init__(file, avg_cost, check, no_desc)
+        super().__init__(file, avg_cost, check, no_desc, options)
         all_commodities_txt = self.run_hledger_no_query_desc("commodities")
         self.all_commodities = [
             com for com in all_commodities_txt.split("\n") if com != ""

@@ -19,8 +19,9 @@ class PromptSell(prompt.Prompt):
         avg_cost: bool,
         check: bool,
         no_desc: str | None = None,
+        options: Options | None = None,
     ) -> None:
-        super().__init__(file, avg_cost, check, no_desc)
+        super().__init__(file, avg_cost, check, no_desc, options)
 
         print(self.initial_info)
         self.info = self.get_info()

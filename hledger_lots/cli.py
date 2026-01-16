@@ -84,7 +84,7 @@ def buy(obj: Obj):
 
     file = obj["file"]
     opt = obj["opt"]
-    prompt_buy = PromptBuy(file, opt.avg_cost, opt.check, opt.no_desc)
+    prompt_buy = PromptBuy(file, opt.avg_cost, opt.check, opt.no_desc, opt)
     txn_print = prompt_buy.get_hl_txn()
     click.echo("\n" + txn_print)
 
@@ -97,7 +97,7 @@ def buy(obj: Obj):
 
     commodity = prompt_buy.info["comm"]
     txns = hledger2txn(file, commodity)
-    commodity_directive = CommodityDirective(file)
+    commodity_directive = CommodityDirective(file, opt)
     if opt.avg_cost:
         info = AvgInfo(
             file, commodity, txns, opt.check, None, commodity_directive=commodity_directive
@@ -129,7 +129,7 @@ def sell(obj: Obj):
     """
     file = obj["file"]
     opt = obj["opt"]
-    prompt_sell = PromptSell(file, opt.avg_cost, opt.check, opt.no_desc)
+    prompt_sell = PromptSell(file, opt.avg_cost, opt.check, opt.no_desc, opt)
 
     txn_print = prompt_sell.get_hl_txn()
     click.echo("\n" + txn_print)
@@ -143,7 +143,7 @@ def sell(obj: Obj):
 
     commodity = prompt_sell.info["comm"]
     txns = hledger2txn(file, commodity)
-    commodity_directive = CommodityDirective(file)
+    commodity_directive = CommodityDirective(file, opt)
     if opt.avg_cost:
         info = AvgInfo(
             file, commodity, txns, opt.check, None, commodity_directive=commodity_directive
@@ -178,7 +178,7 @@ def view(obj: Obj, commodity: str):
     opt = obj["opt"]
 
     txns = hledger2txn(file, commodity)
-    commodity_directive = CommodityDirective(file)
+    commodity_directive = CommodityDirective(file, opt)
     if opt.avg_cost:
         info = AvgInfo(
             file, commodity, txns, opt.check, opt.no_desc, commodity_directive=commodity_directive
@@ -212,7 +212,7 @@ def list_commodities(obj: Obj, output_format: str):
     opt = obj["opt"]
 
     txns = all_commodity_txns(file, opt.no_desc)
-    commodity_directive = CommodityDirective(file)
+    commodity_directive = CommodityDirective(file, opt)
     if opt.avg_cost:
         lots_info = AllAvgInfo(
             file, opt.no_desc, txns, opt.check, commodity_directive=commodity_directive
@@ -253,7 +253,7 @@ def prices(obj: Obj):
 
     file = obj["file"]
 
-    yahoo_prices = YahooPrices(file)
+    yahoo_prices = YahooPrices(file, obj["opt"])
     yahoo_prices.print_prices()
 
 

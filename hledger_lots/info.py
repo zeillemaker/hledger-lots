@@ -3,6 +3,7 @@ import re
 import subprocess
 from dataclasses import dataclass, asdict
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from io import StringIO
 from typing import TypedDict
@@ -10,7 +11,7 @@ from textwrap import dedent
 from tabulate import tabulate
 
 from .utils import get_files_comm, get_xirr
-from .file_utils import find_all_included_files
+from .file_utils import find_all_included_files, format_number
 from .types import AdjustedTxn, Txn
 
 
@@ -55,18 +56,34 @@ def get_last_price_dict(files_comm: list[str], commodity_directive=None):
             try:
                 fmt = commodity_directive.get_format(comm)
                 # fmt is a dict with keys 'decimal_mark' and 'thousands_sep'
-                thousands = fmt.get("thousands_sep", "") or ""
-                decimal_mark = fmt.get("decimal_mark", ".") or "."
-                p = price
-                if thousands:
-                    p = p.replace(thousands, "")
-                if decimal_mark != ".":
-                    p = p.replace(decimal_mark, ".")
-                price_value = float(p)
+                try:
+                    price_value = float(price)
+                except ValueError:
+                    # Try parsing with comma as decimal
+                    if "," in price and "." in price:
+                        p = price.replace(".", "").replace(",", ".")
+                    else:
+                        p = price.replace(",", ".")
+                    price_value = float(p)
             except Exception:
-                price_value = float(price)
+                try:
+                    price_value = float(price)
+                except ValueError:
+                    if "," in price and "." in price:
+                        p = price.replace(".", "").replace(",", ".")
+                    else:
+                        p = price.replace(",", ".")
+                    price_value = float(p)
         else:
-            price_value = float(price)
+            try:
+                price_value = float(price)
+            except ValueError:
+                # Try parsing with comma as decimal, handling thousands separators
+                if "," in price and "." in price:
+                    p = price.replace(".", "").replace(",", ".")
+                else:
+                    p = price.replace(",", ".")
+                price_value = float(p)
 
         last_date = datetime.strptime(d_string, "%Y-%m-%d").date()
         if comm not in LAST_PRICE_DICT or last_date > LAST_PRICE_DICT[comm][0]:
@@ -135,13 +152,27 @@ class Info:
         """)
 
         if self.market_date and self.market_price:
-            fmt = self.commodity_directive.get_format(self.commodity)
+            if self.commodity_directive:
+                fmt = self.commodity_directive.get_format(self.commodity)
+            else:
+                fmt = {
+                    "decimal_mark": ".",
+                    "thousands_sep": ",",
+                    "currency_symbol": None,
+                    "currency_position": "right",
+                    "space": True,
+                    "precision": 2,
+                }
+            qtty_val = Decimal(info["qtty"])
+            amount_val = Decimal(info["amount"].replace(",", ""))
+            market_amount = Decimal(str(self.market_price)) * qtty_val
+            market_profit = market_amount - amount_val
             info_txt += dedent(f"""\
-                Market Price:  {format_number(info["mkt_price"], fmt)}
-                Market Amount: {format_number(info["mkt_amount"], fmt)}
-                Market Profit: {format_number(info["mkt_profit"], fmt)}
-                Market Date:   {info["mkt_date"]}
-                Xirr:          {format_number(info["xirr"], fmt)} (APR 30/360US)
+                Market Price:  {format_number(self.market_price, fmt)}
+                Market Amount: {format_number(market_amount, fmt)}
+                Market Profit: {format_number(market_profit, fmt)}
+                Market Date:   {self.market_date.strftime("%Y-%m-%d")}
+                Xirr:          {format_number(Decimal(info["xirr"].rstrip("%")), fmt) if info["xirr"] and info["xirr"] != "N/A" else "N/A"} (APR 30/360US)
             """)
         else:
             info_txt += "\nMarket Data not available"

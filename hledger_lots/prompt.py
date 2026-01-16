@@ -129,6 +129,7 @@ class Prompt:
         avg_cost: bool,
         check: bool,
         no_desc: str | None = None,
+        options: Options | None = None,
     ) -> None:
         self.file = file
         self.check = check
@@ -136,7 +137,7 @@ class Prompt:
         self.avg_cost = avg_cost
 
         self.files_comm = get_files_comm(file)
-        self.commodity_directive = CommodityDirective(self.file)
+        self.commodity_directive = CommodityDirective(self.file, options)
         self.infos = self.get_infos()
         self.commodities = [info["comm"] for info in self.get_infos()]
 

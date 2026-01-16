@@ -2,7 +2,8 @@ from dataclasses import dataclass
 
 
 NAMESPACE = "hledger-lots"
-KEYS = {"avg_cost", "check", "no_desc"}
+REQUIRED_KEYS = {"avg_cost", "check", "no_desc"}
+OPTIONAL_KEYS = {"decimal_mark", "thousands_sep"}
 
 
 @dataclass
@@ -10,6 +11,8 @@ class Options:
     avg_cost: bool
     check: bool
     no_desc: str
+    decimal_mark: str | None = None
+    thousands_sep: str | None = None
 
 
 class OptionError(BaseException):
@@ -37,7 +40,7 @@ class HledgerVars:
             return None
 
         key = var_key_value[0].strip(" \n")
-        value = var_key_value[1].strip()
+        value = var_key_value[1].strip().strip('"')
         result = (key, value)
         return result
 
@@ -50,9 +53,9 @@ class HledgerVars:
         if len(vars_str) == 0:
             return
 
-        vars_list = vars_str.split(",")
-        vars_tuple = (self.get_var_tuple(var) for var in vars_list)
-        vars_dict = {var[0]: var[1] for var in vars_tuple if var}
+        import re
+        vars_list = re.findall(r'(\w+):\s*([^,]*)', vars_str)
+        vars_dict = {key: value.strip().strip('"') for key, value in vars_list}
         return vars_dict
 
     def get_file_vars(self, file: str, namespace: str):
@@ -91,7 +94,7 @@ def get_options(files: tuple[str, ...]):
     hledger_vars = HledgerVars(files)
     vars = hledger_vars.get_namespace_vars(NAMESPACE)
     existing_keys = set(vars.keys())
-    missing = KEYS.difference(existing_keys)
+    missing = REQUIRED_KEYS.difference(existing_keys)
 
     if len(missing) > 0:
         raise OptionError(f"Missing keys {missing}")
@@ -109,4 +112,6 @@ def get_options(files: tuple[str, ...]):
     avg_cost = True if vars["avg_cost"] == "true" else False
     check = True if vars["check"] == "true" else False
     no_desc = vars["no_desc"]
-    return Options(avg_cost, check, no_desc)
+    decimal_mark = vars.get("decimal_mark")
+    thousands_sep = vars.get("thousands_sep")
+    return Options(avg_cost, check, no_desc, decimal_mark, thousands_sep)
