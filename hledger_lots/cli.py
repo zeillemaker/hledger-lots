@@ -181,11 +181,11 @@ def view(obj: Obj, commodity: str):
     commodity_directive = CommodityDirective(file, opt)
     if opt.avg_cost:
         info = AvgInfo(
-            file, commodity, txns, opt.check, opt.no_desc, commodity_directive=commodity_directive
+            file, commodity, txns, opt.check, opt.no_desc, commodity_directive=commodity_directive, options=opt
         )
     else:
         info = FifoInfo(
-            file, commodity, txns, opt.check, opt.no_desc, commodity_directive
+            file, commodity, txns, opt.check, opt.no_desc, commodity_directive, opt
         )
 
     click.echo(info.table)
@@ -215,11 +215,11 @@ def list_commodities(obj: Obj, output_format: str):
     commodity_directive = CommodityDirective(file, opt)
     if opt.avg_cost:
         lots_info = AllAvgInfo(
-            file, opt.no_desc, txns, opt.check, commodity_directive=commodity_directive
+            file, opt.no_desc, txns, opt.check, commodity_directive=commodity_directive, options=opt
         )
     else:
         lots_info = AllFifoInfo(
-            file, opt.no_desc, txns, opt.check, commodity_directive=commodity_directive
+            file, opt.no_desc, txns, opt.check, commodity_directive=commodity_directive, options=opt
         )
 
     if output_format == "pretty":

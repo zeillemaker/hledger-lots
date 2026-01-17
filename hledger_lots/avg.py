@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from . import checks
 from .lib import CostMethodError, adjust_commodity
+from .options import Options
 from .utils import get_xirr
 from .types import AdjustedTxn, Txn
 
@@ -17,24 +18,33 @@ class AvgCost:
     avg_cost: float = 0
 
 
-def check_sell(sell: AdjustedTxn, avg_cost: float, check: bool):
+def check_sell(sell: AdjustedTxn, avg_cost: float, check: bool, options: Options | None = None):
     if not check:
         return
 
-    decimals_price = Decimal(str(sell.price)).as_tuple().exponent
-    decimals_avg = Decimal(str(avg_cost)).as_tuple().exponent
-    if isinstance(decimals_price, int) and isinstance(decimals_avg, int):
-        decimals = min(abs(decimals_price), abs(decimals_avg))
+    max_decimal = options.max_decimal_totalvalue_lots_sell if options else None
+    
+    if max_decimal is not None:
+        # Use total value rounding instead of price precision
+        sell_total = round(sell.price * abs(sell.qtty), max_decimal)
+        avg_total = round(avg_cost * abs(sell.qtty), max_decimal)
+        if sell_total != avg_total:
+            raise CostMethodError(sell, avg_cost, sell.base_cur)
     else:
-        raise ValueError("Not a decimal")
+        # Original logic: compare prices with decimal precision
+        decimals_price = Decimal(str(sell.price)).as_tuple().exponent
+        decimals_avg = Decimal(str(avg_cost)).as_tuple().exponent
+        if isinstance(decimals_price, int) and isinstance(decimals_avg, int):
+            decimals = min(abs(decimals_price), abs(decimals_avg))
+        else:
+            raise ValueError("Not a decimal")
 
-    if abs(sell.price - avg_cost) > 10 ** (-decimals):
-        raise CostMethodError(sell, avg_cost, sell.base_cur)
-    pass
+        if abs(sell.price - avg_cost) > 10 ** (-decimals):
+            raise CostMethodError(sell, avg_cost, sell.base_cur)
 
 
 def get_avg_cost(
-    txns: list[AdjustedTxn], check: bool, until: date | None = None
+    txns: list[AdjustedTxn], check: bool, until: date | None = None, options: Options | None = None
 ) -> list[AvgCost]:
     if until:
         included_txns = [
@@ -59,7 +69,7 @@ def get_avg_cost(
         if txn.qtty >= 0:
             total_amount += txn.qtty * txn.price
         else:
-            check_sell(txn, avg_cost, check)
+            check_sell(txn, avg_cost, check, options)
             total_amount += txn.qtty * avg_cost
 
         avg_cost = total_amount / total_qtty if total_qtty != 0 else 0
@@ -78,6 +88,7 @@ def avg_sell(
     comm_account: str,
     value: float,
     check: bool,
+    options: Options | None = None,
 ):
     adj_comm = adjust_commodity(cur)
     checks.check_short_sell_current(txns, qtty)
@@ -85,7 +96,7 @@ def avg_sell(
     checks.check_available(txns, comm_account, qtty)
 
     sell_date = datetime.strptime(date, "%Y-%m-%d").date()
-    avg_cost = get_avg_cost(txns, check)
+    avg_cost = get_avg_cost(txns, check, options=options)
     cost = avg_cost[-1].avg_cost
 
     base_curr = txns[0].base_cur

@@ -2,6 +2,7 @@ from datetime import datetime
 
 from .checks import MultipleBaseCurrencies
 from .fifo import get_lots
+from .file_utils import format_number
 from .hl import hledger2txn
 from .info import AllInfo, Info, LotsInfo
 from .lib import dt_list2table, get_avg_fifo
@@ -17,6 +18,7 @@ class FifoInfo(Info):
         check: bool | None = None,
         no_desc: str | None = None,
         commodity_directive=None,
+        options=None,
     ):
         # Backwards-compatible constructor: either pass (journals, commodity, txns, check)
         # or the legacy form (journals, commodity, check) where txns will be fetched.
@@ -33,8 +35,23 @@ class FifoInfo(Info):
             journals, commodity, commodity_txns, no_desc, commodity_directive
         )
         self.check = check_flag
+        self.options = options
 
-        self.lots = get_lots(self.txns, self.check)
+        self.lots = get_lots(self.txns, self.check, self.options)
+        if self.commodity_directive:
+            fmt = self.commodity_directive.get_format(self.commodity)
+        else:
+            fmt = {
+                "decimal_mark": ".",
+                "thousands_sep": ",",
+                "currency_symbol": None,
+                "currency_position": "right",
+                "space": True,
+                "precision": 2,
+            }
+        for lot in self.lots:
+            if isinstance(lot, dict):
+                lot['price'] = format_number(lot['price'], fmt)
         self.last_buy_date = self.lots[-1].date if len(self.lots) > 0 else None
 
         self.table = dt_list2table(self.lots)
@@ -106,16 +123,18 @@ class AllFifoInfo(AllInfo):
         commodity_txns: dict[str, list[AdjustedTxn]],
         check: bool,
         commodity_directive=None,
+        options=None,
     ):
         super().__init__(journals, no_desc)
         self.check = check
         self.commodity_txns = commodity_txns
         self.commodity_directive = commodity_directive
+        self.options = options
 
     def get_info(self, commodity: str):
         txns = self.commodity_txns.get(commodity, [])
         try:
-            lots = get_lots(txns, self.check)
+            lots = get_lots(txns, self.check, self.options)
         except MultipleBaseCurrencies:
             return None
 
@@ -126,6 +145,7 @@ class AllFifoInfo(AllInfo):
                 txns,
                 self.check,
                 commodity_directive=getattr(self, "commodity_directive", None),
+                options=self.options,
             ).get_info()
             return lot_info
 

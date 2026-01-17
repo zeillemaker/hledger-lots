@@ -16,6 +16,7 @@ class AvgInfo(Info):
         check: bool | None = None,
         no_desc: str | None = None,
         commodity_directive=None,
+        options=None,
     ):
         # Backwards-compatible constructor: either pass (journals, commodity, txns, check)
         # or the legacy form (journals, commodity, check) where txns will be fetched.
@@ -30,7 +31,8 @@ class AvgInfo(Info):
 
         super().__init__(journals, commodity, txns, no_desc, commodity_directive)
         self.check = check_flag
-        self.avg_lots = get_avg_cost(self.txns, self.check)
+        self.options = options
+        self.avg_lots = get_avg_cost(self.txns, self.check, options=self.options)
         self.table = dt_list2table(self.avg_lots)
 
     def get_info(self):
@@ -93,11 +95,13 @@ class AllAvgInfo(AllInfo):
         all_txns: dict[str, list[AdjustedTxn]],
         check: bool,
         commodity_directive=None,
+        options=None,
     ):
         super().__init__(journals, no_desc)
         self.commodity_directive = commodity_directive
         self.check = check
         self.all_txns = all_txns
+        self.options = options
 
     def get_info(self, commodity: str):
         avg_obj = AvgInfo(
@@ -107,6 +111,7 @@ class AllAvgInfo(AllInfo):
             self.check,
             None,
             commodity_directive=getattr(self, "commodity_directive", None),
+            options=self.options,
         )
         if len(avg_obj.txns) == 0:
             return

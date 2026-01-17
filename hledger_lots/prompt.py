@@ -135,6 +135,7 @@ class Prompt:
         self.check = check
         self.no_desc = no_desc
         self.avg_cost = avg_cost
+        self.options = options
 
         self.files_comm = get_files_comm(file)
         self.commodity_directive = CommodityDirective(self.file, options)
@@ -167,11 +168,11 @@ class Prompt:
         txns = all_commodity_txns(self.file, self.no_desc or "")
         if self.avg_cost:
             infos = AllAvgInfo(
-                self.file, self.no_desc or "", txns, self.check, commodity_directive=self.commodity_directive
+                self.file, self.no_desc or "", txns, self.check, commodity_directive=self.commodity_directive, options=self.options
             )
         else:
             infos = AllFifoInfo(
-                self.file, self.no_desc or "", txns, self.check, commodity_directive=self.commodity_directive
+                self.file, self.no_desc or "", txns, self.check, commodity_directive=self.commodity_directive, options=self.options
             )
 
         valid_infos = [info for info in infos.infos if float(info["qtty"]) > 0]

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 NAMESPACE = "hledger-lots"
 REQUIRED_KEYS = {"avg_cost", "check", "no_desc"}
-OPTIONAL_KEYS = {"decimal_mark", "thousands_sep"}
+OPTIONAL_KEYS = {"decimal_mark", "thousands_sep", "max_decimal_totalvalue_lots_sell"}
 
 
 @dataclass
@@ -13,6 +13,7 @@ class Options:
     no_desc: str
     decimal_mark: str | None = None
     thousands_sep: str | None = None
+    max_decimal_totalvalue_lots_sell: int | None = None
 
 
 class OptionError(BaseException):
@@ -67,6 +68,18 @@ class HledgerVars:
         import re
         vars_list = re.findall(r'(\w+):\s*([^,]*)', vars_str)
         vars_dict = {key: value.strip().strip('"') for key, value in vars_list}
+        
+        # Apply word mappings
+        for k, v in vars_dict.items():
+            if v == 'comma':
+                vars_dict[k] = ','
+            elif v == 'dot' or v == 'period':
+                vars_dict[k] = '.'
+            elif v == 'apostrophe' or v == 'quote':
+                vars_dict[k] = "'"
+            elif v == 'space':
+                vars_dict[k] = ' '
+        
         return vars_dict
 
     def get_file_vars(self, file: str, namespace: str):
@@ -125,4 +138,6 @@ def get_options(files: tuple[str, ...]):
     no_desc = vars["no_desc"]
     decimal_mark = vars.get("decimal_mark")
     thousands_sep = vars.get("thousands_sep")
-    return Options(avg_cost, check, no_desc, decimal_mark, thousands_sep)
+    max_decimal_totalvalue_lots_sell_str = vars.get("max_decimal_totalvalue_lots_sell")
+    max_decimal_totalvalue_lots_sell = int(max_decimal_totalvalue_lots_sell_str) if max_decimal_totalvalue_lots_sell_str is not None else None
+    return Options(avg_cost, check, no_desc, decimal_mark, thousands_sep, max_decimal_totalvalue_lots_sell)

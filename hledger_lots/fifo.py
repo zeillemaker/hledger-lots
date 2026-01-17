@@ -5,11 +5,12 @@ from textwrap import dedent
 
 from . import checks
 from .lib import CostMethodError, adjust_commodity, get_avg_fifo
+from .options import Options
 from .utils import get_xirr
 from .types import AdjustedTxn, Txn
 
 
-def check_sell(sell: AdjustedTxn, previous_buys: list[AdjustedTxn], check: bool):
+def check_sell(sell: AdjustedTxn, previous_buys: list[AdjustedTxn], check: bool, options: Options | None = None):
     if not check:
         return
 
@@ -20,11 +21,18 @@ def check_sell(sell: AdjustedTxn, previous_buys: list[AdjustedTxn], check: bool)
         return
 
     previous_buy = diff_zero[0]
-    if sell.price != previous_buy.price or sell.base_cur != previous_buy.base_cur:
-        raise CostMethodError(sell, previous_buy.price, previous_buy.base_cur)
+    max_decimal = options.max_decimal_totalvalue_lots_sell if options else None
+    if max_decimal is not None:
+        sell_total = round(sell.price * abs(sell.qtty), max_decimal)
+        buy_total = round(previous_buy.price * abs(sell.qtty), max_decimal)
+        if sell_total != buy_total or sell.base_cur != previous_buy.base_cur:
+            raise CostMethodError(sell, previous_buy.price, previous_buy.base_cur)
+    else:
+        if sell.price != previous_buy.price or sell.base_cur != previous_buy.base_cur:
+            raise CostMethodError(sell, previous_buy.price, previous_buy.base_cur)
 
 
-def get_lots(txns: list[AdjustedTxn], check: bool) -> list[AdjustedTxn]:
+def get_lots(txns: list[AdjustedTxn], check: bool, options: Options | None = None) -> list[AdjustedTxn]:
     local_txns = copy.deepcopy(txns)
     checks.check_base_currency(txns)
 
@@ -41,7 +49,7 @@ def get_lots(txns: list[AdjustedTxn], check: bool) -> list[AdjustedTxn]:
         i = 0
         while i < len(previous_buys) and sell_qtty > 0:
             previous_buy = previous_buys[i]
-            check_sell(sell, previous_buys, check)
+            check_sell(sell, previous_buys, check, options)
             if sell_qtty >= previous_buy.qtty:
                 sell_qtty -= previous_buy.qtty
                 previous_buys[i].qtty = 0
@@ -57,10 +65,10 @@ def get_lots(txns: list[AdjustedTxn], check: bool) -> list[AdjustedTxn]:
 
 
 def get_sell_lots(
-    lots: list[AdjustedTxn], sell_date: str, sell_qtty: float, check: bool
+    lots: list[AdjustedTxn], sell_date: str, sell_qtty: float, check: bool, options: Options | None = None
 ):
     checks.check_short_sell_current(lots, sell_qtty)
-    buy_lots = get_lots(lots, check)
+    buy_lots = get_lots(lots, check, options)
     previous_buys = [lot for lot in buy_lots.copy() if lot.date <= sell_date]
 
     fifo_lots: list[AdjustedTxn] = []

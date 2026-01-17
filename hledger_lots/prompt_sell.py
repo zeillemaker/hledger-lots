@@ -96,6 +96,7 @@ class PromptSell(prompt.Prompt):
                 comm_account=sell.commodity_account,
                 value=sell.value,
                 check=self.check,
+                options=self.options,
             )
         else:
             sell_fifo = fifo.get_sell_lots(
@@ -103,6 +104,7 @@ class PromptSell(prompt.Prompt):
                 sell_date=sell.date,
                 sell_qtty=sell.quantity,
                 check=self.check,
+                options=self.options,
             )
             txn_print = fifo.txn2hl(
                 txns=sell_fifo,
