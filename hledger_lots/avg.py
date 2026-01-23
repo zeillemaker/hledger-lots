@@ -90,6 +90,7 @@ def avg_sell(
     value: float,
     check: bool,
     options: Options | None = None,
+    commodity_directive=None,
 ):
     adj_comm = adjust_commodity(cur)
     checks.check_short_sell_current(txns, qtty)
@@ -103,19 +104,21 @@ def avg_sell(
     total_cost_rounded = total_cost.quantize(Decimal('0.01'))
 
     base_curr = txns[0].base_cur
+    fmt_cur = commodity_directive.get_format(cur) if commodity_directive else None
+    fmt_base = commodity_directive.get_format(base_curr) if commodity_directive else None
     price = value / qtty
     xirr = get_xirr(price, sell_date, txns) or 0 * 100
 
-    qtty_fmt = format_number(qtty, None, include_symbol=False, min_precision=2)
-    price_fmt = format_number(price, None, include_symbol=False, min_precision=2)
-    qty_neg_fmt = format_number(qtty * -1, None, include_symbol=False, min_precision=2)
+    qtty_fmt = format_number(qtty, fmt_cur, include_symbol=False, min_precision=2)
+    price_fmt = format_number(price, fmt_base, include_symbol=False, min_precision=2)
+    qty_neg_fmt = format_number(qtty * -1, fmt_cur, include_symbol=False, min_precision=2)
 
     txn_hl = f"""{date} Sold {cur}  ; cost_method:avg_cost
     ; commodity:{cur}, qtty:{qtty_fmt}, price:{price_fmt}
     ; avg_cost:{cost:.4f}, total_cost:{total_cost:.2f}, xirr:{xirr:.2f}% annual percent rate 30/360US
-    {cash_account}    {value:.2f} {base_curr}
-    {comm_account}    {qty_neg_fmt} {adj_comm} @@ {total_cost_rounded:.2f} {base_curr}
-    {revenue_account}    {format((-(Decimal(str(value)) - total_cost_rounded)).normalize(), 'f')} {base_curr}"""
+    {cash_account}    {format_number(value, fmt_base, include_symbol=False, precision=2)} {base_curr}
+    {comm_account}    {qty_neg_fmt} {adj_comm} @@ {format_number(total_cost_rounded, fmt_base, include_symbol=False, precision=2)} {base_curr}
+    {revenue_account}    {format_number(-(Decimal(str(value)) - total_cost_rounded), fmt_base, include_symbol=False, precision=2)} {base_curr}"""
 
     comm = ["hledger", "-f-", "print", "--explicit"]
     txn_proc = subprocess.run(comm, input=txn_hl.encode(), capture_output=True)

@@ -102,9 +102,12 @@ def txn2hl(
     cash_account: str,
     revenue_account: str,
     value: float,
+    commodity_directive=None,
 ):
     adj_comm = adjust_commodity(cur)
     base_curr = txns[0].base_cur
+    fmt_cur = commodity_directive.get_format(cur) if commodity_directive else None
+    fmt_base = commodity_directive.get_format(base_curr) if commodity_directive else None
     avg_cost = get_avg_fifo(txns)
     total_cost = sum(txn.qtty * txn.price for txn in txns)
     sum_qtty = sum(txn.qtty for txn in txns)
@@ -112,20 +115,20 @@ def txn2hl(
     dt = datetime.strptime(date, "%Y-%m-%d").date()
     xirr = get_xirr(price, dt, txns) or 0 * 100
 
-    sum_qtty_fmt = format_number(sum_qtty, None, include_symbol=False, min_precision=2)
-    price_fmt = format_number(price, None, include_symbol=False, min_precision=2)
+    sum_qtty_fmt = format_number(sum_qtty, fmt_cur, include_symbol=False, min_precision=2)
+    price_fmt = format_number(price, fmt_base, include_symbol=False, min_precision=2)
 
     txn_hl = dedent(f"""\
         {date} Sold {cur}  ; cost_method:fifo
             ; commodity:{cur}, qtty:{sum_qtty_fmt}, price:{price_fmt}
             ; avg_cost:{avg_cost:,.4f}, total_cost:{total_cost:.2f}, xirr:{xirr:.2f}% annual percent rate 30/360US
-            {cash_account}  {value:.2f} {base_curr}
+            {cash_account}  {format_number(value, fmt_base, include_symbol=False, precision=2)} {base_curr}
     """)
 
     for txn in txns:
-        qty_fmt = format_number(txn.qtty * -1, None, include_symbol=False, min_precision=2)
+        qty_fmt = format_number(txn.qtty * -1, fmt_cur, include_symbol=False, min_precision=2)
         total = txn.qtty * txn.price
-        total_fmt = format_number(total, None, include_symbol=False, precision=2)
+        total_fmt = format_number(total, fmt_base, include_symbol=False, precision=2)
         txn_hl += f"        {txn.acct}    {qty_fmt} {adj_comm} @@ {total_fmt} {base_curr}  ; buy_date:{txn.date}, base_cur:{txn.base_cur}\n"
 
     txn_hl += f"    {revenue_account}   "

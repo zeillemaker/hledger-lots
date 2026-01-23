@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import questionary
 
 from . import avg, fifo, prompt
+from .commodity_tag import CommodityDirective
 from .hl import hledger2txn
 from .info import LotsInfo
 
@@ -22,6 +23,8 @@ class PromptSell(prompt.Prompt):
         options: Options | None = None,
     ) -> None:
         super().__init__(file, avg_cost, check, no_desc, options)
+
+        self.commodity_directive = CommodityDirective(file, options)
 
         print(self.initial_info)
         self.info = self.get_info()
@@ -97,6 +100,7 @@ class PromptSell(prompt.Prompt):
                 value=sell.value,
                 check=self.check,
                 options=self.options,
+                commodity_directive=self.commodity_directive,
             )
         else:
             sell_fifo = fifo.get_sell_lots(
@@ -113,6 +117,7 @@ class PromptSell(prompt.Prompt):
                 cash_account=sell.cash_account,
                 revenue_account=sell.revenue_account,
                 value=sell.value,
+                commodity_directive=self.commodity_directive,
             )
 
         return txn_print

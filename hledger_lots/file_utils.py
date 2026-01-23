@@ -44,7 +44,7 @@ def format_number(
     if fmt is None:
         fmt = {
             "decimal_mark": ".",
-            "thousands_sep": ",",
+            "thousands_sep": "",
             "currency_symbol": None,
             "currency_position": "right",
             "space": True,
