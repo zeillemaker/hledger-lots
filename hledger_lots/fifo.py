@@ -124,7 +124,9 @@ def txn2hl(
 
     for txn in txns:
         qty_fmt = format_number(txn.qtty * -1, None, include_symbol=False, min_precision=2)
-        txn_hl += f"        {txn.acct}    {qty_fmt} {adj_comm} @ {txn.price} {base_curr}  ; buy_date:{txn.date}, base_cur:{txn.base_cur}\n"
+        total = txn.qtty * txn.price
+        total_fmt = format_number(total, None, include_symbol=False, precision=2)
+        txn_hl += f"        {txn.acct}    {qty_fmt} {adj_comm} @@ {total_fmt} {base_curr}  ; buy_date:{txn.date}, base_cur:{txn.base_cur}\n"
 
     txn_hl += f"    {revenue_account}   "
     comm = ["hledger", "-f-", "print", "--explicit"]

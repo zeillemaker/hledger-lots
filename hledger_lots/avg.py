@@ -99,7 +99,8 @@ def avg_sell(
     sell_date = datetime.strptime(date, "%Y-%m-%d").date()
     avg_cost = get_avg_cost(txns, check, options=options)
     cost = avg_cost[-1].avg_cost
-    total_cost = cost * qtty
+    total_cost = Decimal(str(cost)) * Decimal(str(qtty))
+    total_cost_rounded = total_cost.quantize(Decimal('0.01'))
 
     base_curr = txns[0].base_cur
     price = value / qtty
@@ -113,8 +114,8 @@ def avg_sell(
     ; commodity:{cur}, qtty:{qtty_fmt}, price:{price_fmt}
     ; avg_cost:{cost:.4f}, total_cost:{total_cost:.2f}, xirr:{xirr:.2f}% annual percent rate 30/360US
     {cash_account}    {value:.2f} {base_curr}
-    {comm_account}    {qty_neg_fmt} {adj_comm} @ {cost} {base_curr}
-    {revenue_account}    {format((-(Decimal(str(value)) - Decimal(str(cost)) * Decimal(str(qtty))).normalize()), 'f')} {base_curr}"""
+    {comm_account}    {qty_neg_fmt} {adj_comm} @@ {total_cost_rounded:.2f} {base_curr}
+    {revenue_account}    {format((-(Decimal(str(value)) - total_cost_rounded)).normalize(), 'f')} {base_curr}"""
 
     comm = ["hledger", "-f-", "print", "--explicit"]
     txn_proc = subprocess.run(comm, input=txn_hl.encode(), capture_output=True)
