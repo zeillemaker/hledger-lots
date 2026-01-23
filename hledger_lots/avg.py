@@ -99,6 +99,7 @@ def avg_sell(
     sell_date = datetime.strptime(date, "%Y-%m-%d").date()
     avg_cost = get_avg_cost(txns, check, options=options)
     cost = avg_cost[-1].avg_cost
+    total_cost = cost * qtty
 
     base_curr = txns[0].base_cur
     price = value / qtty
@@ -110,7 +111,7 @@ def avg_sell(
 
     txn_hl = f"""{date} Sold {cur}  ; cost_method:avg_cost
     ; commodity:{cur}, qtty:{qtty_fmt}, price:{price_fmt}
-    ; xirr:{xirr:.2f}% annual percent rate 30/360US
+    ; avg_cost:{cost:.4f}, total_cost:{total_cost:.2f}, xirr:{xirr:.2f}% annual percent rate 30/360US
     {cash_account}    {value:.2f} {base_curr}
     {comm_account}    {qty_neg_fmt} {adj_comm} @ {cost} {base_curr}
     {revenue_account}    {format((-(Decimal(str(value)) - Decimal(str(cost)) * Decimal(str(qtty))).normalize()), 'f')} {base_curr}"""

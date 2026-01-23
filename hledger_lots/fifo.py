@@ -106,6 +106,7 @@ def txn2hl(
     adj_comm = adjust_commodity(cur)
     base_curr = txns[0].base_cur
     avg_cost = get_avg_fifo(txns)
+    total_cost = sum(txn.qtty * txn.price for txn in txns)
     sum_qtty = sum(txn.qtty for txn in txns)
     price = value / sum_qtty
     dt = datetime.strptime(date, "%Y-%m-%d").date()
@@ -117,7 +118,7 @@ def txn2hl(
     txn_hl = dedent(f"""\
         {date} Sold {cur}  ; cost_method:fifo
             ; commodity:{cur}, qtty:{sum_qtty_fmt}, price:{price_fmt}
-            ; avg_cost:{avg_cost:,.4f}, xirr:{xirr:.2f}% annual percent rate 30/360US
+            ; avg_cost:{avg_cost:,.4f}, total_cost:{total_cost:.2f}, xirr:{xirr:.2f}% annual percent rate 30/360US
             {cash_account}  {value:.2f} {base_curr}
     """)
 

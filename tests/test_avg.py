@@ -139,7 +139,7 @@ class TestAvgSell:
 
         expected = """2022-02-01 Sold AAPL  ; cost_method:avg_cost
     ; commodity:AAPL, qtty:50.00, price:20.00
-    ; xirr:3.56% annual percent rate 30/360US
+    ; avg_cost:17.8488, total_cost:892.44, xirr:3.56% annual percent rate 30/360US
     Asset:Bank                                       1000.00 USD
     Acct1                   -50.00 AAPL @ 17.848837209302324 USD
     Revenue:Capital Gain                  -107.5581395348838 USD
