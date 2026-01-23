@@ -62,7 +62,7 @@ def select_commodities_text(commodities: list[str]):
     answer = questionary.select(
         "Commodity",
         choices=commodities,
-        use_shortcuts=True,
+        use_shortcuts=len(commodities) <= 36,
     ).ask()
     return answer
 
