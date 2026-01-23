@@ -120,23 +120,53 @@ class PromptBuy(prompt.Prompt):
         return result
 
     def get_hl_txn(self):
+        from hledger_lots.file_utils import format_number
+
         buy = self.prompt()
 
+        # Get formatting options from self.options
+        fmt = None
+        precision = 2
+        if self.options:
+            # Try to get commodity-specific format, fallback to options
+            try:
+                fmt = self.commodity_directive.get_format(buy.base_cur)
+            except Exception:
+                pass
+            if not fmt:
+                fmt = {
+                    "decimal_mark": self.options.decimal_mark or ".",
+                    "thousands_sep": self.options.thousands_sep or "",
+                    "currency_symbol": None,
+                    "currency_position": "right",
+                    "space": True,
+                    "precision": self.options.max_decimal_totalvalue_lots_sell or 2,
+                }
+            if self.options.max_decimal_totalvalue_lots_sell is not None:
+                precision = self.options.max_decimal_totalvalue_lots_sell
+            else:
+                precision = fmt.get("precision", 2)
+        else:
+            fmt = {
+                "decimal_mark": ".",
+                "thousands_sep": "",
+                "currency_symbol": None,
+                "currency_position": "right",
+                "space": True,
+                "precision": 2,
+            }
+
+        # Format asset quantity with at least 2 decimals
+        qty_str = f"{buy.quantity:.2f}"
+        # Format total cost (value) using format_number
+        total_cost_str = format_number(buy.value, fmt, include_symbol=False, min_precision=precision, precision=precision)
+        neg_total_cost_str = format_number(-buy.value, fmt, include_symbol=False, min_precision=precision, precision=precision)
+
+        # Compose the transaction using @@ totalcost
         txn_raw = dedent(f"""\
             {buy.date} Buy {buy.commodity}
-                {buy.commodity_account}    {buy.quantity} \"{buy.commodity}\" @ {buy.price} \"{buy.base_cur}\"
-                {buy.cash_account}
+                {buy.commodity_account}    {qty_str} {buy.commodity} @@ {total_cost_str} {buy.base_cur}
+                {buy.cash_account}           {neg_total_cost_str} {buy.base_cur}
         """)
 
-        comm = ["hledger", "-f-", "print", "--explicit"]
-        txn_proc = subprocess.run(
-            comm,
-            input=txn_raw.encode(),
-            capture_output=True,
-        )
-        if txn_proc.returncode != 0:
-            err = txn_proc.stderr.decode("utf8")
-            raise prompt.PromptError(err)
-
-        txn_print: str = txn_proc.stdout.decode("utf8")
-        return txn_print
+        return txn_raw
