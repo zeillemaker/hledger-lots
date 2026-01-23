@@ -4,6 +4,7 @@ from datetime import datetime
 from textwrap import dedent
 
 from . import checks
+from .file_utils import format_number
 from .lib import CostMethodError, adjust_commodity, get_avg_fifo
 from .options import Options
 from .utils import get_xirr
@@ -110,15 +111,19 @@ def txn2hl(
     dt = datetime.strptime(date, "%Y-%m-%d").date()
     xirr = get_xirr(price, dt, txns) or 0 * 100
 
+    sum_qtty_fmt = format_number(sum_qtty, None, include_symbol=False, min_precision=2)
+    price_fmt = format_number(price, None, include_symbol=False, min_precision=2)
+
     txn_hl = dedent(f"""\
         {date} Sold {cur}  ; cost_method:fifo
-            ; commodity:{cur}, qtty:{sum_qtty:,.2f}, price:{price:,.2f}
+            ; commodity:{cur}, qtty:{sum_qtty_fmt}, price:{price_fmt}
             ; avg_cost:{avg_cost:,.4f}, xirr:{xirr:.2f}% annual percent rate 30/360US
             {cash_account}  {value:.2f} {base_curr}
     """)
 
     for txn in txns:
-        txn_hl += f"        {txn.acct}    {txn.qtty * -1:,.2f} {adj_comm} @ {txn.price} {base_curr}  ; buy_date:{txn.date}, base_cur:{txn.base_cur}\n"
+        qty_fmt = format_number(txn.qtty * -1, None, include_symbol=False, min_precision=2)
+        txn_hl += f"        {txn.acct}    {qty_fmt} {adj_comm} @ {txn.price} {base_curr}  ; buy_date:{txn.date}, base_cur:{txn.base_cur}\n"
 
     txn_hl += f"    {revenue_account}   "
     comm = ["hledger", "-f-", "print", "--explicit"]

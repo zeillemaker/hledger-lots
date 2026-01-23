@@ -4,6 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from . import checks
+from .file_utils import format_number
 from .lib import CostMethodError, adjust_commodity
 from .options import Options
 from .utils import get_xirr
@@ -103,11 +104,15 @@ def avg_sell(
     price = value / qtty
     xirr = get_xirr(price, sell_date, txns) or 0 * 100
 
+    qtty_fmt = format_number(qtty, None, include_symbol=False, min_precision=2)
+    price_fmt = format_number(price, None, include_symbol=False, min_precision=2)
+    qty_neg_fmt = format_number(qtty * -1, None, include_symbol=False, min_precision=2)
+
     txn_hl = f"""{date} Sold {cur}  ; cost_method:avg_cost
-    ; commodity:{cur}, qtty:{qtty:,.2f}, price:{price:,.2f}
+    ; commodity:{cur}, qtty:{qtty_fmt}, price:{price_fmt}
     ; xirr:{xirr:.2f}% annual percent rate 30/360US
     {cash_account}    {value:.2f} {base_curr}
-    {comm_account}    {qtty * -1} {adj_comm} @ {cost} {base_curr}
+    {comm_account}    {qty_neg_fmt} {adj_comm} @ {cost} {base_curr}
     {revenue_account}    {format((-(Decimal(str(value)) - Decimal(str(cost)) * Decimal(str(qtty))).normalize()), 'f')} {base_curr}"""
 
     comm = ["hledger", "-f-", "print", "--explicit"]

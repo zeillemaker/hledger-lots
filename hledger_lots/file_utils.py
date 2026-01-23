@@ -79,10 +79,9 @@ def format_number(
     # format as fixed-point.
     quant = Decimal(10) ** (-desired_precision)
     value = value.quantize(quant, rounding=ROUND_HALF_UP)
+    # Check sign before taking absolute value
+    neg = value < 0
     s = format(value.copy_abs(), "f")
-    neg = s.startswith("-")
-    if neg:
-        s = s[1:]
 
     int_part, _, frac_part = s.partition(".")
 
