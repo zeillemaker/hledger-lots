@@ -156,8 +156,8 @@ class PromptBuy(prompt.Prompt):
                 "precision": 2,
             }
 
-        # Format asset quantity with at least 2 decimals
-        qty_str = f"{buy.quantity:.2f}"
+        # Format asset quantity using format_number to respect decimal_mark and thousands_sep
+        qty_str = format_number(buy.quantity, fmt, include_symbol=False, min_precision=2, precision=2)
         # Format total cost (value) using format_number
         total_cost_str = format_number(buy.value, fmt, include_symbol=False, min_precision=precision, precision=precision)
         neg_total_cost_str = format_number(-buy.value, fmt, include_symbol=False, min_precision=precision, precision=precision)
