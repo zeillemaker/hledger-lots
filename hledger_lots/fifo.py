@@ -23,15 +23,11 @@ def check_sell(sell: AdjustedTxn, previous_buys: list[AdjustedTxn], check: bool,
         return
 
     previous_buy = diff_zero[0]
-    max_decimal = options.max_decimal_totalvalue_lots_sell if options else None
-    if max_decimal is not None:
-        sell_total = round(sell.price * abs(sell.qtty), max_decimal)
-        buy_total = round(previous_buy.price * abs(sell.qtty), max_decimal)
-        if sell_total != buy_total or sell.base_cur != previous_buy.base_cur:
-            raise CostMethodError(sell, previous_buy.price, previous_buy.base_cur)
-    else:
-        if sell.price != previous_buy.price or sell.base_cur != previous_buy.base_cur:
-            raise CostMethodError(sell, previous_buy.price, previous_buy.base_cur)
+    max_decimal = options.max_decimal_totalvalue_lots_sell if options else 2
+    sell_total = round(sell.price * abs(sell.qtty), max_decimal)
+    buy_total = round(previous_buy.price * abs(sell.qtty), max_decimal)
+    if sell_total != buy_total or sell.base_cur != previous_buy.base_cur:
+        raise CostMethodError(sell, previous_buy.price, previous_buy.base_cur)
 
 
 def get_lots(txns: list[AdjustedTxn], check: bool, options: Options | None = None) -> list[AdjustedTxn]:
@@ -78,7 +74,7 @@ def get_sell_lots(
     sell_qtty_curr = Decimal(str(sell_qtty))
 
     i = 0
-    while sell_qtty_curr > 0 and i < len(lots):
+    while sell_qtty_curr > 0 and i < len(previous_buys):
         buy = previous_buys[i]
         buy_qtty = Decimal(str(buy.qtty))
         
