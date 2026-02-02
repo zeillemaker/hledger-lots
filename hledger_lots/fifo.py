@@ -1,6 +1,7 @@
 import copy
 import subprocess
 from datetime import datetime
+from decimal import Decimal
 from textwrap import dedent
 
 from . import checks
@@ -73,23 +74,27 @@ def get_sell_lots(
     previous_buys = [lot for lot in buy_lots.copy() if lot.date <= sell_date]
 
     fifo_lots: list[AdjustedTxn] = []
-    sell_qtty_curr = sell_qtty
+    # Use Decimal for exact arithmetic to avoid floating point errors
+    sell_qtty_curr = Decimal(str(sell_qtty))
 
     i = 0
     while sell_qtty_curr > 0 and i < len(lots):
         buy = previous_buys[i]
+        buy_qtty = Decimal(str(buy.qtty))
+        
         if buy.qtty == 0:
             pass
-        elif sell_qtty_curr > buy.qtty:
+        elif sell_qtty_curr > buy_qtty:
             fifo_lots.append(
                 AdjustedTxn(buy.date, buy.price, buy.base_cur, buy.qtty, buy.acct)
             )
-            sell_qtty_curr -= buy.qtty
+            sell_qtty_curr -= buy_qtty
         else:
+            # Convert back to float for AdjustedTxn
             fifo_lots.append(
-                AdjustedTxn(buy.date, buy.price, buy.base_cur, sell_qtty_curr, buy.acct)
+                AdjustedTxn(buy.date, buy.price, buy.base_cur, float(sell_qtty_curr), buy.acct)
             )
-            sell_qtty_curr = 0
+            sell_qtty_curr = Decimal(0)
         i += 1
 
     return fifo_lots

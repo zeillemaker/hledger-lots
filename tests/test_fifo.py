@@ -83,3 +83,35 @@ class TestTxn2Hl:
 """
 
         assert test == expected
+
+    def test_decimal_precision(self):
+        """Test that FIFO calculation doesn't introduce floating point errors."""
+        from hledger_lots.types import AdjustedTxn
+        
+        # Simulate the real-world scenario from the bug report
+        txns = [
+            AdjustedTxn("2025-11-30", 118.8450, "EUR", 0.08389078, "Assets:Crypto:SOL"),
+            AdjustedTxn("2025-12-26", 106.4252, "EUR", 0.04688739, "Assets:Crypto:SOL"),
+            AdjustedTxn("2025-12-30", 106.1429, "EUR", 0.04701208, "Assets:Crypto:SOL"),
+            AdjustedTxn("2026-01-04", 115.2763, "EUR", 0.08651568, "Assets:Crypto:SOL"),
+        ]
+        
+        # Sell exactly 0.20271703 SOL
+        sell_qtty = 0.20271703
+        sell_lots = fifo.get_sell_lots(txns, "2026-01-17", sell_qtty, check=False)
+        
+        # Verify we got 4 lots
+        assert len(sell_lots) == 4
+        
+        # The last lot should have exactly 0.02492678 (calculated precisely)
+        # Not 0.024926779999999996 (floating point error)
+        expected_last_qtty = 0.02492678
+        actual_last_qtty = sell_lots[3].qtty
+        
+        # They should be equal within reasonable precision
+        assert abs(actual_last_qtty - expected_last_qtty) < 1e-10
+        
+        # Verify total equals sell quantity
+        total_qtty = sum(lot.qtty for lot in sell_lots)
+        assert abs(total_qtty - sell_qtty) < 1e-10
+
